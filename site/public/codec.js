@@ -985,6 +985,16 @@
         body.length
       );
     }
+    if (!(flags & FLAG_RELATIVE_FREEZE)) {
+      return pathhintSkipEvent(
+        start,
+        end,
+        schema,
+        "missing_freeze_until",
+        flags,
+        body.length
+      );
+    }
     if (flags & FLAG_CRC) {
       var got =
         ((body[PATHHINT_BODY_LEN] << 24) |
@@ -1038,6 +1048,8 @@
       next_capacity_bps: nextBps,
       nextCapacityKbps: nextKbps,
       next_capacity_kbps: nextKbps,
+      nextCapacityMeaning: "predicted_bottleneck_bps_sender",
+      next_capacity_meaning: "predicted_bottleneck_bps_sender",
       freezeMs: freezeMs,
       freeze_ms: freezeMs,
       freezeUntilMs: freezeMs,
@@ -1188,7 +1200,7 @@
         usePathhintCrc: false,
         wrapP9: true,
         note:
-          "ASCENT-D: outer RS(255,223) erase-on-fail. Skip extra PATHHINT CRC. Spool/deep-space, not interactive Starlink IP.",
+          "ASCENT-D: full RS(255,223) P9 erase-on-fail for spool/deep-space/high-BER only. Skip extra PATHHINT CRC. Not for interactive Starlink IP/QUIC.",
       };
     }
     if (
@@ -1207,7 +1219,7 @@
         usePathhintCrc: true,
         wrapP9: false,
         note:
-          "ASCENT-E-LEO: Starlink/LEO IP already has PHY+TLS. Prefer light PATHHINT CRC or none. Do not wrap interactive turns in P9 RS. PATHHINT is a goodput hint, not an RF Mbps upgrade.",
+          "ASCENT-E-LEO: Starlink IP/QUIC. Light integrity = PATHHINT CRC (v1) or short RS(255,239) I=1; never full RS(255,223). next_capacity is predicted sender bottleneck bps, not RF PHY. Do not wrap interactive turns in P9.",
       };
     }
     return {
@@ -1218,6 +1230,37 @@
       wrapP9: false,
       note: "ASCENT-E default: plain PATHHINT unit; optional CRC. P9 only if integrity requested.",
     };
+  }
+
+  function evaluatePathhint(ev, opts) {
+    opts = opts || {};
+    var out = {};
+    for (var k in ev) {
+      if (Object.prototype.hasOwnProperty.call(ev, k)) out[k] = ev[k];
+    }
+    if (!out.applied) return out;
+    var schema = out.schema != null ? out.schema : 0;
+    if (schema !== 1) {
+      out.applied = false;
+      out.skipped = true;
+      out.reason = "unknown_schema";
+      return out;
+    }
+    var nowMs = opts.nowMs != null ? opts.nowMs : opts.now_ms;
+    var recvMs = opts.receivedAtMs != null ? opts.receivedAtMs : opts.received_at_ms;
+    var ttl = out.ttlMs != null ? out.ttlMs : out.ttl_ms;
+    if (nowMs != null && recvMs != null && ttl != null) {
+      if (nowMs > recvMs + ttl) {
+        out.applied = false;
+        out.skipped = true;
+        out.reason = "ttl_expired";
+      }
+    }
+    return out;
+  }
+
+  function pathhintOverheadBytes(crc) {
+    return crc ? 34 : 30;
   }
 
   /**
@@ -1422,6 +1465,8 @@
     decodeSkystate: decodeSkystate,
     canonicalPathhintBytes: canonicalPathhintBytes,
     recommendIntegrity: recommendIntegrity,
+    evaluatePathhint: evaluatePathhint,
+    pathhintOverheadBytes: pathhintOverheadBytes,
     crc32Ieee: crc32Ieee,
     LEAD_SKYSTATE: LEAD_SKYSTATE,
     PATHHINT_SCHEMA_V1: PATHHINT_SCHEMA_V1,

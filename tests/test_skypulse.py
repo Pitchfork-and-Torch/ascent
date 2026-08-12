@@ -27,6 +27,8 @@ from ascent_skypulse import (  # noqa: E402
     recommend_integrity,
     should_queue_session,
     wrap_pathhint_p9,
+    evaluate_pathhint,
+    pathhint_overhead_bytes,
 )
 
 VECTORS = json.loads(
@@ -51,6 +53,7 @@ def test_canonical_plain_hex():
     assert abs(ev[0]["obstruction"] - f["obstruction"]) < 1e-9
     assert abs(ev[0]["elev_deg"] - f["elev_deg"]) < 1e-9
     assert ev[0]["crc"] is False
+    assert ev[0]["next_capacity_meaning"] == "predicted_bottleneck_bps_sender"
     print("PASS test_canonical_plain_hex")
 
 
@@ -195,10 +198,54 @@ def test_meter_honesty():
     hint = PathHint.from_event(decode_stream(canonical_pathhint_bytes())[0])
     line = format_pathhint_meter(hint)
     assert "RF" not in line
-    assert "cap_hint=" in line
+    assert "bottleneck_hint=" in line
+    assert "freeze_until=" in line
     skip = format_pathhint_meter(PathHint(applied=False, reason="crc_fail"))
-    assert "skip" in skip
+    assert "erase" in skip
     print("PASS test_meter_honesty")
+
+
+def test_ttl_and_missing_freeze_erase():
+    from ascent_skypulse import evaluate_pathhint
+
+    ev = decode_stream(canonical_pathhint_bytes())[0]
+    live = evaluate_pathhint(ev, now_ms=10_000, received_at_ms=0)
+    assert live["applied"] is True
+    stale = evaluate_pathhint(ev, now_ms=40_000, received_at_ms=0)
+    assert stale["applied"] is False
+    assert stale["reason"] == "ttl_expired"
+    # v1 requires FLAG_RELATIVE_FREEZE; clear it => erase
+    raw = bytearray(canonical_pathhint_bytes(crc=False))
+    raw[4] = raw[4] & ~0x08
+    ev2 = decode_stream(bytes(raw))[0]
+    assert ev2["applied"] is False
+    assert ev2["reason"] == "missing_freeze_until"
+    print("PASS test_ttl_and_missing_freeze_erase")
+
+
+def test_ship_metrics_not_rf():
+    from ascent_skypulse import pathhint_overhead_bytes
+
+    plain = canonical_pathhint_bytes(crc=False)
+    crc = canonical_pathhint_bytes(crc=True)
+    assert len(plain) == pathhint_overhead_bytes(crc=False) == 30
+    assert len(crc) == pathhint_overhead_bytes(crc=True) == 34
+    applied = 0
+    rejected = 0
+    samples = [
+        plain,
+        crc,
+        bytes.fromhex("c599000401020304"),
+        bytes([0xC5, 0x01, 0x00, 0x03, 0x00, 0x00, 0x00]),
+    ]
+    for s in samples:
+        ev = decode_stream(s)[0]
+        if ev.get("applied"):
+            applied += 1
+        else:
+            rejected += 1
+    assert applied == 2 and rejected == 2
+    print("PASS test_ship_metrics_not_rf")
 
 
 def test_mixed_hello_still_three_plus_hint():
@@ -223,6 +270,8 @@ def main() -> int:
     test_queue_policy()
     test_optional_p9_wrap()
     test_meter_honesty()
+    test_ttl_and_missing_freeze_erase()
+    test_ship_metrics_not_rf()
     test_mixed_hello_still_three_plus_hint()
     print("ALL SKYPULSE TESTS PASS")
     return 0

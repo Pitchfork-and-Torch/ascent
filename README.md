@@ -32,7 +32,7 @@ ASCENT is a **wire encoding and control grammar** for text, agents, multimodal r
 | **Multimodal** | Content-addressed refs and length-declared media units (no surrogate-pair hacks) |
 | **Quantum-safe control** | Append-only algorithm registry; no silent downgrade |
 | **Deep-space (ASCENT-D)** | Outer ECC frames; parity fail erases the unit (no mojibake) |
-| **SkyPulse (PATHHINT)** | LEO path foresight for usable goodput; fail-closed skip; not an RF Mbps upgrade |
+| **SkyPulse (PATHHINT)** | LEO path foresight for **usable session bandwidth**; fail-closed skip; not an RF Mbps upgrade |
 | **Self-describing** | A valid document can carry plane maps, registries, and version history |
 
 This is **not** "Unicode but better." It is a stream contract greppers can still trust.
@@ -41,7 +41,7 @@ This is **not** "Unicode but better." It is a stream contract greppers can still
 
 **https://ascent.jonbailey.xyz/**
 
-**ASCENT Nexus Wire Lab 2.0** (architecture card **v2.1.0**): dual text/hex live sync, agent + multimodal composers, **SkyPulse PATHHINT** panel (LEO-IP vs D), ASCENT-D bit-error / erase-on-fail simulator, AEGIR sketch, interactive eleven-plane explorer, 2-minute tour, SPEC try-this, and codegen. Dual-mode Grok+Starlink plan (CLOUD / EDGE / QUEUE) with usable-goodput honesty. Sacred P0 meter and Hello, Universe sample included.
+**ASCENT Nexus Wire Lab 2.0** (architecture card **v2.1.0**): dual text/hex live sync, agent + multimodal composers, **SkyPulse PATHHINT** panel (LEO-IP vs D), ASCENT-D bit-error / erase-on-fail simulator, AEGIR sketch, interactive eleven-plane explorer, 2-minute tour, SPEC try-this, and codegen. Dual-mode Grok+Starlink plan (CLOUD / EDGE / QUEUE) with **usable session bandwidth** honesty. Sacred P0 meter and Hello, Universe sample included.
 
 Follow: [@suddenlyjon](https://x.com/suddenlyjon)
 
@@ -88,9 +88,10 @@ python tests/test_ascent_d_satellite.py
 
 Module: `ref/ascent_d.py`.
 
-### SkyPulse PATHHINT (LEO usable goodput)
+### SkyPulse PATHHINT (usable session bandwidth)
 
-Fail-closed path hint for Starlink-class IP. **Does not raise RF Mbps.**
+Fail-closed path hint for Starlink-class IP. Improves **usable session bandwidth**
+and continuity under LEO. **Does not raise RF Mbps.** Not a bare "bandwidth upgrade."
 
 ```bash
 set PYTHONPATH=ref
@@ -99,7 +100,7 @@ python -m ascent pathhint --profile ASCENT-E-LEO
 python examples/ascent_starlink_client/daemon.py --pathhint
 ```
 
-Docs: [docs/SKYPULSE.md](docs/SKYPULSE.md). Profile note: **ASCENT-E-LEO** (light CRC, no P9 RS on interactive IP) vs **ASCENT-D** (spool/deep-space).
+Docs: [docs/SKYPULSE.md](docs/SKYPULSE.md). Profile note: **ASCENT-E-LEO** (light CRC or short RS, no full P9 on interactive IP) vs **ASCENT-D** (spool/deep-space). Ship order: SPEC appendix + goldens + wire 2.1.0, then Wire Lab, then publish codec, LeoAware later.
 
 ### AEGIR (ASCENT-native encryption companion)
 

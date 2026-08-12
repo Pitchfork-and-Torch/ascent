@@ -133,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
                         "PATHHINT:",
                         "applied=" + str(ev.get("applied")),
                         "path_id=" + str(ev.get("path_id")),
-                        "cap_bps=" + str(ev.get("next_capacity_bps")),
+                        "bottleneck_bps=" + str(ev.get("next_capacity_bps")),
                         "reason=" + str(ev.get("reason") or ""),
                     )
                 else:

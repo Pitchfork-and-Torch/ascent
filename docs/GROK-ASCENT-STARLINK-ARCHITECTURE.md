@@ -26,23 +26,23 @@ Three layers people collapse into one slogan:
 
 **One sentence:** Starlink keeps you on the public Internet when *your* last mile dies; ASCENT keeps sessions and payloads honest when the link is ugly; SkyPulse PATHHINT gives CCA/apps a fail-closed freeze/capacity seed so LEO flaps waste fewer retransmits; only local models keep a brain when the public Internet (and therefore xAI) is actually gone.
 
-**SkyPulse does not make Starlink faster at RF.** It improves *usable* goodput and session continuity.
+**SkyPulse does not make Starlink faster at RF.** It improves **usable session bandwidth** and session continuity. Not a bare "bandwidth upgrade."
 
 ---
 
 ## 0. SkyPulse (PATHHINT) on Starlink IP
 
-Priority for this architecture: **usable application goodput**, not PHY Mbps slogans.
+Priority for this architecture: **usable session bandwidth**, not PHY Mbps slogans.
 
 | Piece | Role |
 |-------|------|
-| PATHHINT / SKYSTATE `0xC5` schema `0x01` | Compact hint: path_id, next_capacity_bps, freeze_ms, confidence, ttl, optional obstruction/elev |
-| Fail-closed | Corrupt/unknown => skip; never apply a bad hint to CCA |
-| ASCENT-E-LEO | Usage profile of E: light CRC or none; **no P9 RS** on interactive IP |
-| ASCENT-D | Keep for spool / deep-space; RS(255,223) erase-on-fail |
+| PATHHINT / SKYSTATE `0xC5` schema `0x01` | Compact hint: path_id, next_capacity (predicted sender bottleneck bits/s, not RF PHY), freeze_until, confidence, ttl; optional obstruction/elev |
+| Fail-closed | CRC/short-RS fail, stale TTL, unknown version => erase; never apply a bad hint to CCA |
+| ASCENT-E-LEO | Usage profile of E: light CRC or short RS(255,239) I=1 (not stacked); **no full P9 RS** on interactive IP |
+| ASCENT-D | Keep for spool / deep-space / high-BER; RS(255,223) erase-on-fail |
 | QUEUE | Daemon mode when obstruction or RTT flaps; CLOUD/EDGE still name the brain honestly |
 
-LeoAware (OrbitStack) should consume PATHHINT as: freeze **growth**, seed next_capacity, fail-closed skip. **Never** gate `loss_burst` REPROBE on the hint. Absolute dual-gate remains a paid OrbitStack product fence. See `docs/SKYPULSE.md` and `docs/ORBITSTACK-LEOAWARE-BRIDGE.md`.
+LeoAware (OrbitStack) hybrid fuse: PATHHINT may seed freeze + next_capacity; Orb pathID still owns REPROBE when not suppressed; assist suppress ~2s / no hybrid util-MD; predictive pre-hop freeze is **growth freeze only** and must **never** gate `ep:loss_burst`. Absolute dual-gate remains a paid OrbitStack product fence. See `docs/SKYPULSE.md` and `docs/ORBITSTACK-LEOAWARE-BRIDGE.md`.
 
 Canonical lab unit (50 Mbps is a *hint*, not a dish measurement):
 
@@ -243,14 +243,12 @@ Emit a PATHHINT unit on the turn ADU (before or after the greppable header). Rec
 
 ```
 0xC5 schema=0x01 len body
-  path_id, next_capacity_bps, freeze_ms, confidence, ttl_ms,
+  path_id, next_capacity (sender bottleneck bps, not RF PHY),
+  freeze_until (relative freeze_ms), confidence, ttl_ms,
   optional obstruction, optional elev_deg, optional CRC
 ```
 
-On fail: skip (do not apply). Optional P9 wrap only for spool. See `docs/SKYPULSE.md`.
-
-
-**Not** on interactive path. Treat as P6 REF or separate content-addressed annex (ASCENT-A style). Starlink can carry large downloads when Priority bandwidth allows; ASCENT only carries the **hash + metadata**, not the multi-GB blob in-band.
+On fail: erase (do not apply). Stale TTL or unknown version: erase. Optional P9 wrap only for spool. See `docs/SKYPULSE.md`.
 
 ---
 
@@ -271,12 +269,12 @@ On fail: skip (do not apply). Optional P9 wrap only for spool. See `docs/SKYPULS
 ### 4.2 Sacred-meter diagnostics (operator UX)
 
 ```
-[ASCENT] mode=CLOUD  p0=1.00  api=ok  rtt=48ms  dish=ONLINE  queue=0  pathhint cap_hint=50.0Mbps freeze=15000ms conf=0.80
-[ASCENT] mode=EDGE   p0=1.00  api=DOWN dish=ONLINE  queue=3  model=llama3.1:8b
-[ASCENT] mode=QUEUE  p0=1.00  api=ok   dish=OBSTRUCTED queue=12 pathhint obst=0.40
+[ASCENT] sim mode=CLOUD  p0=1.00  api=ok  rtt=48ms  dish=ONLINE  queue=0  pathhint bottleneck_hint=50.0Mbps freeze_until=15000ms conf=0.80
+[ASCENT] sim mode=EDGE   p0=1.00  api=DOWN dish=ONLINE  queue=3  model=llama3.1:8b
+[ASCENT] sim mode=QUEUE  p0=1.00  api=ok   dish=OBSTRUCTED queue=12 pathhint obst=0.40
 ```
 
-`cap_hint` is application goodput seed, not a Starlink RF reading.
+Prefix is **sim** unless a real dish probe ran (`obs`). `bottleneck_hint` is predicted sender bottleneck, not a Starlink RF reading. This client does not invent a Starlink telemetry API. TCP :9200 is reachability only.
 
 ### 4.3 Skeleton layout
 
@@ -371,7 +369,7 @@ ASCENT-D is **integrity + fail-closed**, not a substitute for TLS/BPSec.
 - CLI/daemon: dual-mode cloud Grok + local Ollama.  
 - ASCENT framing for turns (P0 + P5).  
 - Failover WAN (fiber primary, Starlink secondary) optional at router.  
-- Dish status optional via community gRPC tools.  
+- Dish status optional via community tools when a real dish exists. This repo does not invent a Starlink telemetry API.
 - Store-and-forward spool when API/RTT bad.  
 - **Exit:** survive home ISP outage with cloud Grok still answering; survive API outage with edge mode.
 

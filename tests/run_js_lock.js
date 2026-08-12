@@ -166,6 +166,10 @@ function main() {
   var pev = C.decodeStream(plainHint);
   ok(pev.length === 1 && pev[0].kind === "pathhint" && pev[0].applied === true, "plain applied");
   ok(pev[0].pathId === 66 && pev[0].nextCapacityBps === 50000000, "plain fields");
+  ok(
+    pev[0].next_capacity_meaning === "predicted_bottleneck_bps_sender",
+    "next_capacity is sender bottleneck, not RF PHY"
+  );
   ok(Math.abs(pev[0].confidence - 0.8) < 1e-9, "plain confidence");
   ok(Math.abs(pev[0].obstruction - 0.2) < 1e-9, "plain obstruction");
   ok(Math.abs(pev[0].elevDeg - 42.0) < 1e-9, "plain elev");
@@ -185,6 +189,22 @@ function main() {
   var dee = C.recommendIntegrity("ASCENT-D");
   ok(leo.wrapP9 === false && leo.mode === "crc", "LEO-IP no P9 RS");
   ok(dee.wrapP9 === true && dee.mode === "p9", "D uses P9");
+  var ttlLive = C.evaluatePathhint(pev[0], { nowMs: 1000, receivedAtMs: 0 });
+  ok(ttlLive.applied === true, "TTL live still applied");
+  var ttlDead = C.evaluatePathhint(pev[0], { nowMs: 40000, receivedAtMs: 0 });
+  ok(ttlDead.applied === false && ttlDead.reason === "ttl_expired", "stale TTL erase");
+  ok(plainHint.length === 30 && crcHint.length === 34, "PATHHINT overhead 30/34 B");
+  ok(
+    C.pathhintOverheadBytes(false) === 30 && C.pathhintOverheadBytes(true) === 34,
+    "pathhintOverheadBytes helper"
+  );
+  var noFreeze = new Uint8Array(plainHint);
+  noFreeze[4] = noFreeze[4] & ~0x08;
+  ok(
+    C.decodeStream(noFreeze)[0].applied === false &&
+      C.decodeStream(noFreeze)[0].reason === "missing_freeze_until",
+    "missing freeze_until erase"
+  );
 
   // P9 lock against Python freeze
   var unit = C.fromHex(freeze.p9_hello_unit_hex);

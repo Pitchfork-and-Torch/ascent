@@ -1,8 +1,13 @@
 """Starlink dish health probe (optional, non-authoritative).
 
-Default: stub that reports UNKNOWN so the client runs without RE tools.
-Wire real probes via community starlink-grpc-tools against 192.168.100.1:9200
-for diagnostics only. Never treat dish gRPC as a security boundary.
+Default: stub so the client runs without a dish. This module does **not**
+invent a Starlink telemetry API.
+
+Observational (`obs` sacred-meter): opt-in TCP reachability to the dish LAN
+port (`STARLINK_PROBE=1`, typically 192.168.100.1:9200). Open/closed only.
+
+Lab (`sim` sacred-meter): `ASCENT_DISH_STATE` / `ASCENT_OBSTRUCTION` overrides.
+Never treat TCP :9200 as PHY rate, obstruction fraction, or SNR.
 """
 from __future__ import annotations
 
@@ -21,13 +26,13 @@ class DishHealth:
 
 
 def probe(timeout: float = 0.25) -> DishHealth:
-    """Return dish health. Lab overrides via env; no RF, diagnostics only.
+    """Return dish health. Lab overrides via env; no RF, no fake telemetry API.
 
     Env:
-      STARLINK_PROBE=1          TCP probe 192.168.100.1:9200
-      ASCENT_OBSTRUCTION=0.0-1  lab obstruction fraction
-      ASCENT_ELEV_DEG           lab elevation
-      ASCENT_DISH_STATE         ONLINE|OBSTRUCTED|OFFLINE|UNKNOWN
+      STARLINK_PROBE=1          TCP reachability to 192.168.100.1:9200
+      ASCENT_OBSTRUCTION=0.0-1  lab obstruction fraction (sim)
+      ASCENT_ELEV_DEG           lab elevation (sim)
+      ASCENT_DISH_STATE         ONLINE|OBSTRUCTED|OFFLINE|UNKNOWN (sim)
     """
     obst = _env_float("ASCENT_OBSTRUCTION")
     elev = _env_float("ASCENT_ELEV_DEG")

@@ -47,7 +47,7 @@
       name: "Escape nucleus",
       role: "Length-prefixed ops / DEF",
       detail:
-        "C0 DEF documents, C1 AGENT_OP, and C5 SKYSTATE/PATHHINT (SkyPulse) are length-declared so unknowns can be skipped safely. PATHHINT is a LEO goodput hint, not an RF Mbps upgrade.",
+        "C0 DEF documents, C1 AGENT_OP, and C5 SKYSTATE/PATHHINT (SkyPulse) are length-declared so unknowns can be skipped safely. PATHHINT is usable session bandwidth foresight, not an RF Mbps upgrade.",
       example: "hello",
     },
     {
@@ -171,7 +171,7 @@
     {
       title: "7 · SkyPulse PATHHINT",
       body:
-        "LEO usable goodput: a PATHHINT unit seeds next_capacity and freeze_ms so apps/CCA waste fewer retransmits. Not an RF Mbps claim. Fail-closed skip on corrupt hints. Toggle ASCENT-E-LEO vs D in the SkyPulse panel.",
+        "LEO usable session bandwidth: a PATHHINT unit seeds predicted sender bottleneck (next_capacity) and freeze_until so apps/CCA waste fewer retransmits. Not an RF Mbps claim. Fail-closed erase on corrupt/stale hints. Toggle ASCENT-E-LEO vs D in the SkyPulse panel (sim).",
       sample: "skypulse",
     },
   ];
@@ -216,7 +216,7 @@
       id: "skypulse",
       label: "SkyPulse",
       html:
-        "<h3>SkyPulse PATHHINT (P2 0xC5)</h3><p>Additive SKYSTATE unit. Schema 0x01 carries path_id, next_capacity_bps, freeze_ms, confidence, ttl, optional obstruction/elev. Fail-closed skip. ASCENT-E-LEO: light CRC, no P9 on interactive Starlink IP. Does <strong>not</strong> raise RF Mbps.</p><pre>0xC5 schema:u8 len:u16be body\nflags path_id:u64be cap:u32be freeze:u32be\nconf:u16be ttl:u32be obst:u8 elev:i16be [crc32]</pre>",
+        "<h3>SkyPulse PATHHINT (P2 0xC5)</h3><p>Additive SKYSTATE unit. Schema 0x01 required fields: path_id, next_capacity (predicted sender bottleneck bits/s, not RF PHY), freeze_until, confidence, ttl. elev/obstruction optional. Fail-closed erase. ASCENT-E-LEO: light CRC or short RS, never full P9 on interactive Starlink IP. Does <strong>not</strong> raise RF Mbps. Wire Lab panel is <strong>sim</strong>.</p><pre>0xC5 schema:u8 len:u16be body\nflags path_id:u64be cap:u32be freeze:u32be\nconf:u16be ttl:u32be obst:u8 elev:i16be [crc32]</pre>",
       sample: "skypulse",
     },
     {
@@ -703,15 +703,15 @@
     bar.style.width = Math.max(4, pct) + "%";
     bar.classList.toggle("warn", !a.pureAscent7 && a.total > 0);
     if (!a.total) {
-      meter.textContent = "Empty stream. Sacred range awaits.";
+      meter.textContent = "[sim] Empty stream. Sacred range awaits.";
       meter.className = "sacred-readout";
     } else if (a.pureAscent7) {
       meter.textContent =
-        "ASCENT-7 identity: 100% sacred P0. Every byte is classic ASCII. Greppers smile.";
+        "[sim] ASCENT-7 identity: 100% sacred P0. Every byte is classic ASCII. Greppers smile.";
       meter.className = "sacred-readout ok";
     } else {
       meter.textContent =
-        "Sacred P0 holds " +
+        "[sim] Sacred P0 holds " +
         pct.toFixed(0) +
         "% of bytes. Extension planes present - P0 meaning unchanged.";
       meter.className = "sacred-readout warn";
@@ -914,9 +914,9 @@
           escapeHtml(applied) +
           "</div><p>path_id <code>" +
           escapeHtml(String(e.pathId != null ? e.pathId : e.path_id)) +
-          "</code> · cap_hint " +
+          "</code> · bottleneck_hint " +
           escapeHtml(String(cap)) +
-          " bps · freeze " +
+          " bps · freeze_until " +
           escapeHtml(String(freeze)) +
           " ms · conf " +
           escapeHtml(String(e.confidence)) +
@@ -926,7 +926,7 @@
           escapeHtml(String(el == null ? "na" : el)) +
           " deg · ttl " +
           escapeHtml(String(e.ttlMs != null ? e.ttlMs : e.ttl_ms)) +
-          " ms</p><p class=\"form-hint\">Goodput/CCA hint. Not a Starlink RF Mbps claim.</p>";
+          " ms</p><p class=\"form-hint\">Goodput/CCA hint (sim). Predicted sender bottleneck, not a Starlink RF Mbps claim.</p>";
       } else if (type === "crypto") {
         card.innerHTML =
           '<div class="ev-label">CRYPTO · alg 0x' +
@@ -1702,8 +1702,8 @@
         i += cp > 0xffff ? 2 : 1;
       }
       meter.textContent = pure
-        ? "ASCENT-7: every character is classic ASCII."
-        : "Contains codepoints above 127 - extension planes on the wire.";
+        ? "[sim] ASCENT-7: every character is classic ASCII."
+        : "[sim] Contains codepoints above 127 - extension planes on the wire.";
       meter.className = "sacred-readout " + (pure ? "ok" : "warn");
     };
     input.addEventListener("input", paint);
@@ -1874,7 +1874,7 @@
       }
       if (st) {
         st.textContent = hint && hint.applied
-          ? "PATHHINT applied. cap_hint is goodput seed, not RF Mbps. profile " + (pol && pol.profile)
+          ? "PATHHINT applied (sim). bottleneck_hint is predicted sender bottleneck, not RF Mbps. profile " + (pol && pol.profile)
           : "PATHHINT skipped (" + ((hint && hint.reason) || "none") + "). Fail-closed.";
         st.className = "status-line " + (hint && hint.applied ? "ok" : "warn");
       }

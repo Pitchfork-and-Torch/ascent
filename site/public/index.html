@@ -75,7 +75,7 @@
       "name": "What is ASCENT Nexus Wire Lab 2.0?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "The interactive public face of ASCENT (v2.1.0): dual text/hex live sync, SkyPulse PATHHINT (LEO usable goodput, not RF Mbps), agent and multimodal composers, ASCENT-D bit-error erase-on-fail simulator, AEGIR sketch, eleven-plane architecture explorer, guided tour, and codegen snippets."
+        "text": "The interactive public face of ASCENT (v2.1.0): dual text/hex live sync, SkyPulse PATHHINT (usable session bandwidth, not RF Mbps), agent and multimodal composers, ASCENT-D bit-error erase-on-fail simulator, AEGIR sketch, eleven-plane explorer, guided tour, and codegen snippets."
       }
     }
   ]
@@ -165,10 +165,10 @@
       <span class="tag">self-describing DEF</span>
     </div>
     <div class="panel" style="margin-top:1.25rem" id="sacred">
-      <div class="panel-title">Sacred meter · live from Wire Lab</div>
+      <div class="panel-title">Sacred meter · sim (Wire Lab)</div>
       <div class="meter-track"><div class="meter-bar" id="sacred-bar"></div></div>
-      <div class="sacred-readout ok" id="sacred-meter" role="status">Waiting for stream...</div>
-      <p class="form-hint" style="margin-top:0.55rem">Also try a quick ASCENT-7 check:</p>
+      <div class="sacred-readout ok" id="sacred-meter" role="status">Waiting for stream (sim)...</div>
+      <p class="form-hint" style="margin-top:0.55rem">Wire Lab meters are <strong>sim</strong>. Observational dish telemetry is not invented here. Also try a quick ASCENT-7 check:</p>
       <input class="sacred-input" id="sacred-input" type="text" value="#!/usr/bin/env bash echo Hello, Universe." spellcheck="false" aria-label="Type text to check ASCENT-7 identity">
       <div class="sacred-readout" id="sacred-input-meter" style="margin-top:0.45rem"></div>
     </div>
@@ -217,7 +217,7 @@
   <section id="lab">
     <div class="sec-label">Wire Lab 2.0</div>
     <h2>Prose and hex, one living stream.</h2>
-    <p class="lede">Dual synchronized editors, color-coded byte map, agent and multimodal composers, <strong>SkyPulse PATHHINT</strong> (LEO usable goodput, not RF Mbps), ASCENT-D noise simulator, and a plane dashboard. Faithful to the draft SPEC packing (Cont <code>0xA0-0xBF</code>, frozen ASCENT-V).</p>
+    <p class="lede">Dual synchronized editors, color-coded byte map, agent and multimodal composers, <strong>SkyPulse PATHHINT</strong> (usable session bandwidth, not RF Mbps), ASCENT-D noise simulator, and a plane dashboard. Faithful to the draft SPEC packing (Cont <code>0xA0-0xBF</code>, frozen ASCENT-V).</p>
 
     <div class="lab-toolbar" id="lab-toolbar">
       <div class="lab-toolbar-left">
@@ -350,17 +350,20 @@
     </div>
 
     <div class="panel" id="skypulse" style="margin-bottom:1rem">
-      <div class="panel-title">SkyPulse PATHHINT · P2 0xC5</div>
+      <div class="panel-title">SkyPulse PATHHINT · P2 0xC5 · sim</div>
       <p class="form-hint">
-        LEO path foresight for <strong>usable application goodput</strong> and session continuity.
-        Encode a sample, inspect fields, toggle <strong>ASCENT-E-LEO</strong> (light CRC, no RS tax)
-        vs <strong>ASCENT-D</strong> (P9 wrap for spool/deep-space).
-        <em>Does not increase Starlink physical RF Mbps.</em> Corrupt/unknown = skip (fail-closed).
+        LEO path foresight for <strong>usable session bandwidth</strong> and session continuity.
+        <code>next_capacity</code> is <strong>predicted bottleneck bits/s as seen by the sender</strong>, not RF PHY.
+        Encode a sample, inspect fields, toggle <strong>ASCENT-E-LEO</strong>
+        (light CRC or short RS, never stacked; no full P9 on interactive Starlink IP)
+        vs <strong>ASCENT-D</strong> (full RS(255,223) P9 for spool/deep-space/high-BER).
+        <em>Does not increase Starlink physical RF Mbps.</em> CRC/short-RS fail, stale TTL, or unknown version = erase (fail-closed).
+        This panel is <strong>sim</strong>.
       </p>
       <div class="form-row">
         <label for="sky-path-id">path_id</label>
         <input type="number" id="sky-path-id" value="66" min="0" style="max-width:6rem">
-        <label for="sky-cap">next_capacity_bps</label>
+        <label for="sky-cap">next_capacity (sender bottleneck bps)</label>
         <input type="number" id="sky-cap" value="50000000" min="0" style="max-width:9rem">
         <label for="sky-freeze">freeze_ms</label>
         <input type="number" id="sky-freeze" value="15000" min="0" style="max-width:6rem">
@@ -378,15 +381,15 @@
       <div class="form-row">
         <label for="sky-profile">Integrity</label>
         <select id="sky-profile" aria-label="LEO-IP vs D integrity">
-          <option value="ASCENT-E-LEO" selected>ASCENT-E-LEO (Starlink IP, light CRC, no P9)</option>
-          <option value="ASCENT-D">ASCENT-D (P9 RS, spool / deep-space)</option>
+          <option value="ASCENT-E-LEO" selected>ASCENT-E-LEO (Starlink IP/QUIC, light CRC or short RS, no full P9)</option>
+          <option value="ASCENT-D">ASCENT-D (full RS(255,223) P9, spool / deep-space / high-BER)</option>
           <option value="ASCENT-E">ASCENT-E (plain unit)</option>
         </select>
         <button type="button" class="btn btn-sm btn-primary" id="btn-sky-encode">Encode sample</button>
         <button type="button" class="btn btn-sm btn-ghost" id="btn-sky-insert">Insert into stream</button>
         <button type="button" class="btn btn-sm btn-ghost" id="btn-sky-canonical">Load golden</button>
       </div>
-      <p class="status-line" id="sky-status" role="status">PATHHINT is a goodput/CCA hint. Not an RF speed claim.</p>
+      <p class="status-line" id="sky-status" role="status">PATHHINT is a usable-session-bandwidth / CCA hint (sim). Not an RF speed claim.</p>
       <pre class="hex-dump" id="sky-fields" style="max-height:160px">Fields appear after encode.</pre>
     </div>
 
@@ -512,8 +515,8 @@ ascent encode --header --role guide "Hello, Universe."</pre>
 
   <section id="resilience">
     <div class="sec-label">Resilience</div>
-    <h2>Usable Starlink goodput, not RF slogans.</h2>
-    <p class="lede">Dual-mode plan so a terminal stays useful when your fiber dies. Starlink is last-mile IP. ASCENT is the wire. SkyPulse PATHHINT is foresight for CCA/apps (freeze growth, seed next_capacity). Grok is cloud compute. When the API is gone, edge models take over. ASCENT does not make Starlink faster at RF.</p>
+    <h2>Usable session bandwidth, not RF slogans.</h2>
+    <p class="lede">Dual-mode plan so a terminal stays useful when your fiber dies. Starlink is last-mile IP. ASCENT is the wire. SkyPulse PATHHINT is foresight for CCA/apps (growth freeze, seed predicted sender bottleneck). Grok is cloud compute. When the API is gone, edge models take over. ASCENT does not make Starlink faster at RF. Not a bare bandwidth upgrade.</p>
     <div class="grid-2">
       <div class="panel">
         <div class="panel-title">Modes</div>
@@ -522,9 +525,9 @@ EDGE   - local OpenAI-compatible model
 QUEUE  - obstruction / RTT flap / store-forward
 DEAD   - honest fail (no power / no model)
 
-SkyPulse PATHHINT: cap_hint + freeze_ms (goodput, not RF)
-ASCENT-E-LEO: light CRC, no P9 RS on interactive IP
-ASCENT-D: P9 RS for spool / deep-space only</pre>
+SkyPulse PATHHINT: bottleneck_hint + freeze_until (usable session bandwidth, not RF)
+ASCENT-E-LEO: light CRC or short RS, no full P9 on interactive IP
+ASCENT-D: full RS(255,223) P9 for spool / deep-space / high-BER only</pre>
       </div>
       <div class="panel">
         <div class="panel-title">Docs + skeleton</div>

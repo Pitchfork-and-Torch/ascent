@@ -37,7 +37,13 @@ RTT_JUMP_MS = 80.0
 
 @dataclass
 class PathHint:
-    """Decoded or to-encode PATHHINT fields (application goodput hint)."""
+    """Decoded or to-encode PATHHINT fields.
+
+    next_capacity_bps is predicted bottleneck bits/s as seen by the sender,
+    never an RF PHY rate. freeze_ms is the required freeze_until window
+    (relative). path_id, confidence, and ttl_ms are required. elev/obstruction
+    optional.
+    """
 
     path_id: int = 0
     next_capacity_bps: int = 0
@@ -114,8 +120,9 @@ def recommend_integrity(profile: str) -> dict[str, Any]:
             "use_pathhint_crc": False,
             "wrap_p9": True,
             "note": (
-                "ASCENT-D: outer RS(255,223) erase-on-fail. Skip extra PATHHINT CRC "
-                "(P9 already CRCs the unit). Use for spool/deep-space, not interactive Starlink IP."
+                "ASCENT-D: full RS(255,223) P9 erase-on-fail for spool / deep-space / "
+                "high-BER only. Skip extra PATHHINT CRC (P9 already protects the unit). "
+                "Not for interactive Starlink IP/QUIC."
             ),
         }
     if p in (
@@ -134,9 +141,10 @@ def recommend_integrity(profile: str) -> dict[str, Any]:
             "use_pathhint_crc": True,
             "wrap_p9": False,
             "note": (
-                "ASCENT-E-LEO: Starlink/LEO IP already has PHY+TLS. Prefer light PATHHINT CRC "
-                "or none. Do not wrap interactive turns in P9 RS (double-FEC tax, extra latency). "
-                "PATHHINT is a goodput/CCA hint, not an RF Mbps upgrade."
+                "ASCENT-E-LEO: Starlink IP/QUIC. Light integrity = PATHHINT CRC (v1 shipped) "
+                "or short RS(255,239) I=1 as a substitute, never stacked. Do not wrap "
+                "interactive turns in full RS(255,223) P9. next_capacity is predicted "
+                "sender bottleneck bps, not RF PHY."
             ),
         }
     return {
@@ -147,6 +155,39 @@ def recommend_integrity(profile: str) -> dict[str, Any]:
         "wrap_p9": False,
         "note": "ASCENT-E default: plain PATHHINT unit; optional CRC. P9 only if integrity requested.",
     }
+
+
+def evaluate_pathhint(
+    ev: dict,
+    *,
+    now_ms: Optional[int] = None,
+    received_at_ms: Optional[int] = None,
+) -> dict:
+    """Fail-closed apply gate: CRC/unknown already skipped at decode.
+
+    Stale TTL or unknown version => erase (applied=False). Never act on corrupt units.
+    """
+    out = dict(ev)
+    if not out.get("applied"):
+        return out
+    schema = int(out.get("schema") or 0)
+    if schema != 1:
+        out["applied"] = False
+        out["skipped"] = True
+        out["reason"] = "unknown_schema"
+        return out
+    if now_ms is not None and received_at_ms is not None:
+        ttl = int(out.get("ttl_ms") or 0)
+        if now_ms > received_at_ms + ttl:
+            out["applied"] = False
+            out["skipped"] = True
+            out["reason"] = "ttl_expired"
+    return out
+
+
+def pathhint_overhead_bytes(*, crc: bool = False) -> int:
+    """Wire bytes for one PATHHINT v1 unit (lead + schema + len + body)."""
+    return 34 if crc else 30
 
 
 def wrap_pathhint_p9(unit: bytes) -> Optional[bytes]:
@@ -217,15 +258,15 @@ def pathhint_from_env_and_dish(
 
 
 def format_pathhint_meter(hint: PathHint, *, applied: Optional[bool] = None) -> str:
-    """ASCII sacred-meter fragment. Never claims RF Mbps."""
+    """ASCII sacred-meter fragment. Never claims RF Mbps. Caller must label sim vs obs."""
     ok = hint.applied if applied is None else applied
     if not ok:
-        return f"pathhint=skip reason={hint.reason or 'fail-closed'}"
+        return f"pathhint=erase reason={hint.reason or 'fail-closed'}"
     cap_mbps = hint.next_capacity_bps / 1_000_000.0
     obst = "na" if hint.obstruction is None else f"{hint.obstruction:.2f}"
     el = "na" if hint.elev_deg is None else f"{hint.elev_deg:.1f}deg"
     return (
-        f"pathhint cap_hint={cap_mbps:.1f}Mbps freeze={hint.freeze_ms}ms "
+        f"pathhint bottleneck_hint={cap_mbps:.1f}Mbps freeze_until={hint.freeze_ms}ms "
         f"conf={hint.confidence:.2f} obst={obst} el={el}"
     )
 
@@ -238,6 +279,8 @@ __all__ = [
     "RTT_QUEUE_MS",
     "PathHint",
     "recommend_integrity",
+    "evaluate_pathhint",
+    "pathhint_overhead_bytes",
     "wrap_pathhint_p9",
     "should_queue_session",
     "pathhint_from_env_and_dish",

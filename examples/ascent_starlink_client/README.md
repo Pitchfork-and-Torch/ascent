@@ -15,9 +15,10 @@ with **SkyPulse PATHHINT** for LEO session continuity.
 See `docs/GROK-ASCENT-STARLINK-ARCHITECTURE.md`, `docs/SKYPULSE.md`,
 and `docs/ORBITSTACK-LEOAWARE-BRIDGE.md`.
 
-Default integrity profile is **ASCENT-E-LEO**: light PATHHINT CRC, no P9 RS on
-interactive IP (avoid double-FEC tax). Use `--ascent-d` / `--profile ASCENT-D`
-only for spool or deep-space.
+Default integrity profile is **ASCENT-E-LEO**: light PATHHINT CRC (or short RS
+as a documented substitute, not stacked), no full P9 RS on interactive IP
+(avoid double-FEC tax). Use `--ascent-d` / `--profile ASCENT-D` only for spool
+or deep-space.
 
 ## Run
 
@@ -58,7 +59,7 @@ Interactive: run without `--once`. Type `/status`, `/flush`, or `/pathhint`.
 | `ASCENT_OBSTRUCTION` | 0..1 lab obstruction fraction |
 | `ASCENT_ELEV_DEG` | lab elevation |
 | `ASCENT_DISH_STATE` | ONLINE / OBSTRUCTED / ... lab override |
-| `ASCENT_PATH_CAP_BPS` | PATHHINT next_capacity seed (goodput hint) |
+| `ASCENT_PATH_CAP_BPS` | PATHHINT next_capacity seed (predicted sender bottleneck, not RF) |
 | `ASCENT_FREEZE_MS` | PATHHINT growth-freeze window |
 | `ASCENT_INTEGRITY_PROFILE` | `ASCENT-E-LEO` (default) or `ASCENT-D` |
 
@@ -71,7 +72,10 @@ Interactive: run without `--once`. Type `/status`, `/flush`, or `/pathhint`.
 | QUEUE | Obstruction / RTT flap, or no brain: spool ADUs under `./spool/` |
 | DEAD | No brain available |
 
-Sacred-meter includes a PATHHINT fragment (`cap_hint=...Mbps freeze=...`). That
-number is an **application goodput hint**, not a Starlink RF measurement.
+Sacred-meter includes a PATHHINT fragment (`bottleneck_hint=...Mbps freeze_until=...`).
+That number is **predicted sender bottleneck**, not a Starlink RF measurement.
+Meter lines are prefixed **sim** unless `STARLINK_PROBE=1` observed a real dish
+TCP port (`obs`). Lab env overrides are always sim. This client does not invent
+a Starlink telemetry API.
 
 ASCII-only status lines. No em/en dashes.

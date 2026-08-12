@@ -66,6 +66,8 @@ try:
         recommend_integrity,
         should_queue_session,
         wrap_pathhint_p9,
+        evaluate_pathhint,
+        pathhint_overhead_bytes,
     )
 except Exception:  # pragma: no cover
     PathHint = None  # type: ignore
@@ -73,6 +75,8 @@ except Exception:  # pragma: no cover
     should_queue_session = None  # type: ignore
     wrap_pathhint_p9 = None  # type: ignore
     format_pathhint_meter = None  # type: ignore
+    evaluate_pathhint = None  # type: ignore
+    pathhint_overhead_bytes = None  # type: ignore
 
 __all__ = [
     "__version__",
@@ -93,6 +97,8 @@ __all__ = [
     "PathHint",
     "recommend_integrity",
     "should_queue_session",
+    "evaluate_pathhint",
+    "pathhint_overhead_bytes",
     "wrap_pathhint_p9",
     "format_pathhint_meter",
     "encode_p9",

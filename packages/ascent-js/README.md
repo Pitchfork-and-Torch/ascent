@@ -27,8 +27,10 @@ const hint = AscentCodec.canonicalPathhintBytes(false);
 const frame = AscentDLab.encodeP9(wire);
 ```
 
-PATHHINT is a LEO goodput/CCA hint, not an RF Mbps upgrade. Prefer
-`AscentCodec.recommendIntegrity("ASCENT-E-LEO")` on Starlink IP (no P9 RS).
+PATHHINT is LEO foresight for **usable session bandwidth**, not an RF Mbps
+upgrade. Prefer `AscentCodec.recommendIntegrity("ASCENT-E-LEO")` on Starlink IP
+(light CRC or short RS; no full P9 RS). `next_capacity` is predicted sender
+bottleneck bits/s.
 
 Sources stay in lockstep with `site/public/` via `npm run sync-from-site`.
 

@@ -590,9 +590,12 @@ def encode_pathhint(
 ) -> bytes:
     """Encode a SkyPulse PATHHINT / SKYSTATE unit (P2 lead 0xC5, schema 0x01).
 
-    v1 freeze is relative milliseconds (FLAG_RELATIVE_FREEZE). If freeze_until_ms
-    is supplied without freeze_ms, it is treated as a relative window (not Unix
-    epoch) so goldens stay deterministic.
+    next_capacity is predicted bottleneck bits/s as seen by the sender, never
+    an RF PHY rate. Required v1 fields (always on the wire): path_id/epoch,
+    freeze_until (relative freeze_ms), confidence, ttl_ms. elev/obstruction
+    optional. v1 freeze is relative milliseconds (FLAG_RELATIVE_FREEZE). If
+    freeze_until_ms is supplied without freeze_ms, it is treated as a relative
+    window (not Unix epoch) so goldens stay deterministic.
     """
     if path_id < 0 or path_id > 0xFFFFFFFFFFFFFFFF:
         raise AscentCodecError("path_id out of u64 range")
@@ -706,6 +709,10 @@ def _parse_pathhint_v1_body(body: bytes, start: int, end: int, schema: int) -> d
         return _pathhint_skip_event(
             start, end, schema, "bad_body_len", flags=flags, body_len=len(body)
         )
+    if not (flags & FLAG_RELATIVE_FREEZE):
+        return _pathhint_skip_event(
+            start, end, schema, "missing_freeze_until", flags=flags, body_len=len(body)
+        )
     if flags & FLAG_CRC:
         got = struct.unpack_from(">I", body, PATHHINT_BODY_LEN)[0]
         expect = crc32_ieee(body[:PATHHINT_BODY_LEN])
@@ -746,6 +753,7 @@ def _parse_pathhint_v1_body(body: bytes, start: int, end: int, schema: int) -> d
         "path_id": path_id,
         "next_capacity_bps": next_bps,
         "next_capacity_kbps": next_kbps,
+        "next_capacity_meaning": "predicted_bottleneck_bps_sender",
         "freeze_ms": freeze_ms,
         "freeze_until_ms": freeze_ms,
         "confidence": conf_u16 / 10000.0,

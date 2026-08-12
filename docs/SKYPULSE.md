@@ -8,40 +8,51 @@ ASCII hyphens only.
 
 ---
 
+## Honesty fence
+
+ASCENT does **not** raise Starlink physical RF Mbps. SkyPulse is for **usable
+session bandwidth**, session continuity, and control overhead under LEO.
+Never market a bare "bandwidth upgrade."
+
 ## What it is
 
 SkyPulse is a **path foresight unit** for LEO IP sessions (Starlink and similar).
-It carries a compact, fail-closed hint:
+It carries a compact, fail-closed hint. Normative field semantics:
 
-- `path_id` / epoch
-- `next_capacity_bps` (application goodput *seed*, not RF PHY rate)
-- `freeze_ms` (relative growth-freeze window for CCA / senders)
-- `confidence` in `[0, 1]`
-- `ttl_ms`
-- optional `obstruction` in `[0, 1]`
-- optional `elev_deg`
-- flags (kbps units, CRC present, field presence)
+| Field | Required | Meaning |
+|-------|----------|---------|
+| `next_capacity` | yes | **Predicted bottleneck bits/s as seen by the sender.** Not RF PHY rate. |
+| `freeze_until` | yes | Growth-freeze window. v1 wire is relative `freeze_ms` (`FLAG_RELATIVE_FREEZE`). Semantic freeze_until = now + freeze_ms. |
+| `path_id` / epoch | yes | Path or epoch. Unknown/new id replaces stale hint. |
+| `confidence` | yes | `[0, 1]` blend weight. |
+| `ttl_ms` | yes | Hint lifetime. Stale TTL => erase (consumer-side). |
+| `obstruction` | optional | `[0, 1]` if present. |
+| `elev_deg` | optional | Degrees if present. |
 
 Apps and congestion control can **slow down, freeze CWND growth, or QUEUE**
 instead of spraying retransmits across a 15-second LEO reconfig or a tree
-obstruction. That is **usable goodput and session continuity**, not a faster radio.
+obstruction. That is **usable session bandwidth and session continuity**, not a
+faster radio.
 
 ## What it is not (honesty fence)
 
 | Claim | Allowed? |
 |-------|----------|
 | ASCENT increases Starlink physical downlink/uplink Mbps | **No** |
+| Bare "bandwidth upgrade" | **No** - say **usable session bandwidth** |
 | "Grok offline in space forever" | **No** |
-| PATHHINT is a measured RF throughput | **No** - it is a hint |
+| PATHHINT is a measured RF throughput | **No** - predicted sender bottleneck |
 | Dual-gate LeoAware product wins | **No** - see OrbitStack bridge |
 | Replace Starlink networking / Dishy firmware | **No** |
+| Invented Starlink telemetry API | **No** |
 
-Allowed: better application goodput, fewer wasted retransmits, foresight for
+Allowed: usable session bandwidth, fewer wasted retransmits, foresight for
 CCA/apps, LEO-efficient framing, fail-closed integrity.
 
 ## Wire (additive, skip-by-length)
 
 Assigned from reserved P2 leads `0xC4-0xCE`. Cont class `0xA0-0xBF` stays frozen.
+No P0-P2 parse-law break. SPEC stays **1.0.0-rc1 + this appendix**.
 
 ```
 0xC5                    # SKYSTATE lead
@@ -55,8 +66,8 @@ PATHHINT v1 body (26 bytes, +4 IEEE CRC-32 if `FLAG_CRC`):
 ```
 flags:u8
 path_id:u64be
-next_capacity:u32be     # bps, or kbps if FLAG_CAP_KBPS
-freeze_ms:u32be         # relative (FLAG_RELATIVE_FREEZE always set in v1)
+next_capacity:u32be     # predicted sender bottleneck; bps, or kbps if FLAG_CAP_KBPS
+freeze_ms:u32be         # relative freeze_until (FLAG_RELATIVE_FREEZE always set in v1)
 confidence:u16be        # 0..10000 => [0.0000, 1.0000]
 ttl_ms:u32be
 obstruction:u8          # 0..255 => [0,1] if FLAG_HAS_OBSTRUCTION; else 0xFF
@@ -64,28 +75,60 @@ elev_deg_x10:i16be      # degrees * 10; 0x7FFF absent
 [crc32:u32be]           # IEEE CRC-32 of the 26-byte prefix
 ```
 
-**Fail-closed:** unknown schema, reserved flags, bad length, CRC fail, or
-truncated body after a readable `len` => **skip unit, do not apply**. Truncation
-before `len` is a hard-fault (SPEC stream truncation rule). Same spirit as
-ASCENT-D erase-on-fail: never feed a corrupt hint into CCA.
+**Fail-closed (never act on corrupt units):**
 
-Optional **P9 wrap** (`D5 E5 C0 DE` + RS(255,223)) when integrity is requested
-(spool / deep-space). Plain unit is the Earth / LEO IP lab default.
+| Condition | Action |
+|-----------|--------|
+| CRC fail or short-RS fail | **erase** (`applied=false`) |
+| Stale TTL | **erase** (consumer `evaluate_pathhint`) |
+| Unknown schema / version | **erase** (skip-by-length) |
+| Missing `FLAG_RELATIVE_FREEZE` | **erase** (`missing_freeze_until`) |
+| Reserved flags, bad length, confidence > 10000 | **erase** |
+| Truncation before `len` is readable | hard-fault (SPEC stream rule) |
 
-Goldens: `tests/skypulse_vectors.json`.
+Goldens: `tests/skypulse_vectors.json`. Canonical 50e6 bps is a **hint**, not RF.
 
-## ASCENT-E-LEO vs ASCENT-D
+## LEO-IP vs ASCENT-D integrity (when each applies)
 
-| | ASCENT-E-LEO | ASCENT-D |
-|--|--------------|----------|
+Do not stack CRC + RS. Pick one profile.
+
+| | ASCENT-E-LEO (Starlink IP/QUIC) | ASCENT-D |
+|--|--------------------------------|----------|
 | Parse law | Same E grammar + PATHHINT | Same + mandatory P9 |
 | Interactive Starlink IP | **Yes** | Poor fit (RS tax + latency) |
-| Integrity | Light PATHHINT CRC or none (TLS already) | RS(255,223) erase-on-fail |
+| Integrity | **Light:** PATHHINT CRC (v1 shipped) **or** short RS(255,239) I=1 as a substitute, never stacked | Full RS(255,223) P9 erase-on-fail |
 | Double FEC | **Forbidden as required** | P9 is the outer ECC; skip extra PATHHINT CRC |
 | Use | Chat/agent turns, PATHHINT, QUEUE | Spool files, deep-space, high BER |
 
 `recommend_integrity("ASCENT-E-LEO")` vs `recommend_integrity("ASCENT-D")`
-in `ref/ascent_skypulse.py`.
+in `ref/ascent_skypulse.py`. Short RS is an allowed LEO-IP substitute, not a
+new v1 wire flag.
+
+## ASCENT ship success metrics
+
+Separate from LeoAware dual-gate. **Not** "+X Mbps Starlink."
+
+| Metric | v1 target |
+|--------|-----------|
+| Goldens Py ≡ JS | `tests/skypulse_vectors.json` + `tests/run_js_lock.js` |
+| PATHHINT round-trip | encode/decode fields match; PathHint.encode() == wire |
+| Erase-on-fail | CRC flip, unknown schema, missing freeze, stale TTL => `applied=false` |
+| Overhead bytes/hint | **30** plain, **34** with CRC |
+| Apply vs reject | lab samples: 2 applied / 2 rejected in `test_ship_metrics_not_rf` |
+
+## Ship order
+
+1. SPEC appendix + goldens + ascent-wire **2.1.0**
+2. Wire Lab panel (meters labeled **sim**)
+3. Publish PATHHINT codec (PyPI/npm later; Jon gated)
+4. LeoAware later (OrbitStack product; not this PR)
+
+Do not claim OrbitStack paid wins. Live site deploy still needs Jon approval.
+
+## Sacred-meter
+
+Observational (`obs`) only when a real dish/API exists. Wire Lab and lab env
+overrides are **sim**. TCP :9200 is reachability, not a telemetry API.
 
 ## Quick start
 
@@ -103,7 +146,7 @@ Client: `examples/ascent_starlink_client/daemon.py --pathhint`
 | Surface | Location |
 |---------|----------|
 | Python wire | `ref/ascent_codec.py` (`encode_pathhint`, `decode_skystate`) |
-| Policy | `ref/ascent_skypulse.py` |
+| Policy | `ref/ascent_skypulse.py` (`evaluate_pathhint`, `recommend_integrity`) |
 | JS | `site/public/ascent_codec.js` / `packages/ascent-js` |
 | SPEC | `SPEC.md` appendix SkyPulse (append-only) |
-| LeoAware | `docs/ORBITSTACK-LEOAWARE-BRIDGE.md` |
+| LeoAware | `docs/ORBITSTACK-LEOAWARE-BRIDGE.md` (hybrid fuse) |

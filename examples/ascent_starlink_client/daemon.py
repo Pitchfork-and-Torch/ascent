@@ -106,6 +106,22 @@ def make_pathhint(dish):
     return blob, hint
 
 
+def meter_source(dish) -> str:
+    """sim unless a real dish probe ran. Lab env overrides are always sim.
+
+    Observational = TCP reachability to the dish LAN port only. This client
+    does not invent a Starlink telemetry API.
+    """
+    if os.environ.get("ASCENT_DISH_STATE", "").strip() or os.environ.get(
+        "ASCENT_OBSTRUCTION", ""
+    ).strip():
+        return "sim"
+    probe = os.environ.get("STARLINK_PROBE", "").strip() in ("1", "true", "yes")
+    if probe and dish.state in ("ONLINE", "OFFLINE", "OBSTRUCTED"):
+        return "obs"
+    return "sim"
+
+
 def sacred_meter(
     mode: str,
     dish: str,
@@ -113,6 +129,7 @@ def sacred_meter(
     detail: str = "",
     rtt_ms: float | None = None,
     hint=None,
+    source: str = "sim",
 ) -> str:
     if mode == "CLOUD":
         api = "ok"
@@ -129,8 +146,9 @@ def sacred_meter(
     ph = ""
     if hint is not None and format_pathhint_meter is not None:
         ph = " " + format_pathhint_meter(hint)
+    tag = "sim" if source != "obs" else "obs"
     return (
-        f"[ASCENT] mode={mode} p0=1.00 api={api} dish={dish} "
+        f"[ASCENT] {tag} mode={mode} p0=1.00 api={api} dish={dish} "
         f"queue={queue_n}{rtt}{extra}{ph}"
     ).strip()
 
@@ -162,7 +180,17 @@ def run_once(text: str, session: str, use_d: bool, profile: str) -> int:
         mode = brain
         detail = result.detail
 
-    print(sacred_meter(mode, dish.state, queue_n, detail, rtt, hint))
+    print(
+        sacred_meter(
+            mode,
+            dish.state,
+            queue_n,
+            detail,
+            rtt,
+            hint,
+            source=meter_source(dish),
+        )
+    )
     if brain == "EDGE":
         print("[ASCENT] EDGE MODE - local model, not frontier Grok")
     if mode == "QUEUE":
@@ -227,6 +255,7 @@ def cmd_status(profile: str) -> int:
             len(q),
             f"probe_cloud={'ok' if cloud else 'DOWN'} pending={[p.name for p in q[:5]]}",
             hint=hint,
+            source=meter_source(dish),
         )
     )
     print(f"[ASCENT] spool={SPOOL}")
@@ -293,7 +322,15 @@ def main() -> int:
     if args.once:
         return run_once(args.once, args.session, args.ascent_d, args.profile)
 
-    print(sacred_meter("IDLE", dish_probe().state, len(list_pending(SPOOL))))
+    idle_dish = dish_probe()
+    print(
+        sacred_meter(
+            "IDLE",
+            idle_dish.state,
+            len(list_pending(SPOOL)),
+            source=meter_source(idle_dish),
+        )
+    )
     print("Commands: empty line quits. /status /flush /pathhint")
     session = args.session
     while True:
