@@ -36,8 +36,8 @@
   "name": "ASCENT Nexus Wire Lab 2.0",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Any",
-  "softwareVersion": "2.0.0",
-  "description": "ASCENT Nexus Wire Lab 2.0 - interactive wire lab for ASCII Successor with Compatible Encoding of Named Text. Sacred P0 identity, agent fences, multimodal, ASCENT-D deep-space profile, architecture card v2.0.3.",
+  "softwareVersion": "2.1.0",
+  "description": "ASCENT Nexus Wire Lab 2.0 - interactive wire lab for ASCII Successor with Compatible Encoding of Named Text. Sacred P0 identity, SkyPulse PATHHINT, agent fences, multimodal, ASCENT-D deep-space profile, architecture card v2.1.0.",
   "url": "https://ascent.jonbailey.xyz/",
   "image": "https://ascent.jonbailey.xyz/og.jpg?v=2.1.0",
   "license": "https://opensource.org/licenses/MIT",
@@ -75,7 +75,7 @@
       "name": "What is ASCENT Nexus Wire Lab 2.0?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "The interactive public face of ASCENT (v2.0.3): dual text/hex live sync, agent and multimodal composers, ASCENT-D bit-error erase-on-fail simulator, AEGIR sketch, eleven-plane architecture explorer, guided tour, and codegen snippets."
+        "text": "The interactive public face of ASCENT (v2.1.0): dual text/hex live sync, SkyPulse PATHHINT (LEO usable goodput, not RF Mbps), agent and multimodal composers, ASCENT-D bit-error erase-on-fail simulator, AEGIR sketch, eleven-plane architecture explorer, guided tour, and codegen snippets."
       }
     }
   ]
@@ -95,6 +95,7 @@
     <a href="#infographic">Card</a>
     <a href="#tour">Tour</a>
     <a href="#lab">Wire Lab</a>
+    <a href="#skypulse">SkyPulse</a>
     <a href="#architecture">Planes</a>
     <a href="#spec">SPEC</a>
     <a href="#install">Install</a>
@@ -105,6 +106,7 @@
     <label for="profile-select">Profile</label>
     <select id="profile-select" aria-label="ASCENT profile">
       <option value="E">ASCENT-E</option>
+      <option value="E-LEO">ASCENT-E-LEO</option>
       <option value="7">ASCENT-7</option>
       <option value="D">ASCENT-D</option>
       <option value="A">ASCENT-A</option>
@@ -115,7 +117,7 @@
 <header class="hero" id="top">
   <canvas id="hero-canvas" aria-hidden="true"></canvas>
   <div class="hero-inner">
-    <div class="badge"><span class="dot" aria-hidden="true"></span> Wire Lab 2.0 · Nexus v2.0.3 dual-mode · MIT · SPEC 1.0.0-rc1</div>
+    <div class="badge"><span class="dot" aria-hidden="true"></span> Wire Lab 2.0 · Nexus v2.1.0 SkyPulse · MIT · SPEC 1.0.0-rc1</div>
     <h1>The next fifty years of text<br><span class="grad">start with a promise to 1963.</span></h1>
     <p class="hero-lead">
       <strong>ASCENT Nexus</strong> is a living instrument for a self-describing stream:
@@ -159,6 +161,7 @@
       <span class="tag">multimodal REF</span>
       <span class="tag">AEGIR / PQ control</span>
       <span class="tag">ASCENT-D erase-on-fail</span>
+      <span class="tag">SkyPulse PATHHINT</span>
       <span class="tag">self-describing DEF</span>
     </div>
     <div class="panel" style="margin-top:1.25rem" id="sacred">
@@ -176,21 +179,21 @@
     <h2>The standard in one frame.</h2>
     <p class="lede">Parse law, planes, Hello Universe stream, profiles, control grammar, and Nexus Wire Lab 2.0 features. Open full size for reading or sharing.</p>
     <div class="panel">
-      <div class="panel-title">Infographic · v2.0.3 Nexus</div>
-      <a href="/infographic.png?v=2.0.3" target="_blank" rel="noopener">
+      <div class="panel-title">Infographic · v2.1.0 Nexus</div>
+      <a href="/infographic.png?v=2.1.0" target="_blank" rel="noopener">
         <img
-          src="/infographic.jpg?v=2.0.3"
+          src="/infographic.jpg?v=2.1.0"
           width="1200"
           height="1600"
-          alt="ASCENT Nexus v2.0.3 infographic: parse law, dual-mode Starlink resilience, Wire Lab 2.0, agents, multimodal, ASCENT-D"
+          alt="ASCENT Nexus v2.1.0 infographic: parse law, SkyPulse PATHHINT, dual-mode Starlink usable-goodput, Wire Lab 2.0, agents, multimodal, ASCENT-D"
           loading="eager"
           decoding="async"
           style="width:100%;height:auto;border-radius:8px;border:1px solid var(--border);display:block"
         >
       </a>
       <div class="cta-row" style="margin-top:0.85rem;margin-bottom:0">
-        <a class="btn btn-sm btn-primary" href="/infographic.png?v=2.0.3" download="ascent-nexus-infographic-v2.0.3.png">Download PNG</a>
-        <a class="btn btn-sm btn-ghost" href="/infographic.jpg?v=2.0.3" download="ascent-nexus-infographic-v2.0.3.jpg">Download JPG</a>
+        <a class="btn btn-sm btn-primary" href="/infographic.png?v=2.1.0" download="ascent-nexus-infographic-v2.1.0.png">Download PNG</a>
+        <a class="btn btn-sm btn-ghost" href="/infographic.jpg?v=2.1.0" download="ascent-nexus-infographic-v2.1.0.jpg">Download JPG</a>
         <a class="btn btn-sm btn-ghost" href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/docs/ascent-infographic.png" rel="noopener">On GitHub</a>
       </div>
     </div>
@@ -214,7 +217,7 @@
   <section id="lab">
     <div class="sec-label">Wire Lab 2.0</div>
     <h2>Prose and hex, one living stream.</h2>
-    <p class="lede">Dual synchronized editors, color-coded byte map, agent and multimodal composers, ASCENT-D noise simulator, and a plane dashboard. Faithful to the draft SPEC packing (Cont <code>0xA0-0xBF</code>, frozen ASCENT-V).</p>
+    <p class="lede">Dual synchronized editors, color-coded byte map, agent and multimodal composers, <strong>SkyPulse PATHHINT</strong> (LEO usable goodput, not RF Mbps), ASCENT-D noise simulator, and a plane dashboard. Faithful to the draft SPEC packing (Cont <code>0xA0-0xBF</code>, frozen ASCENT-V).</p>
 
     <div class="lab-toolbar" id="lab-toolbar">
       <div class="lab-toolbar-left">
@@ -346,6 +349,47 @@
       </div>
     </div>
 
+    <div class="panel" id="skypulse" style="margin-bottom:1rem">
+      <div class="panel-title">SkyPulse PATHHINT · P2 0xC5</div>
+      <p class="form-hint">
+        LEO path foresight for <strong>usable application goodput</strong> and session continuity.
+        Encode a sample, inspect fields, toggle <strong>ASCENT-E-LEO</strong> (light CRC, no RS tax)
+        vs <strong>ASCENT-D</strong> (P9 wrap for spool/deep-space).
+        <em>Does not increase Starlink physical RF Mbps.</em> Corrupt/unknown = skip (fail-closed).
+      </p>
+      <div class="form-row">
+        <label for="sky-path-id">path_id</label>
+        <input type="number" id="sky-path-id" value="66" min="0" style="max-width:6rem">
+        <label for="sky-cap">next_capacity_bps</label>
+        <input type="number" id="sky-cap" value="50000000" min="0" style="max-width:9rem">
+        <label for="sky-freeze">freeze_ms</label>
+        <input type="number" id="sky-freeze" value="15000" min="0" style="max-width:6rem">
+      </div>
+      <div class="form-row">
+        <label for="sky-conf">confidence</label>
+        <input type="number" id="sky-conf" value="0.8" min="0" max="1" step="0.05" style="max-width:5rem">
+        <label for="sky-ttl">ttl_ms</label>
+        <input type="number" id="sky-ttl" value="30000" min="0" style="max-width:6rem">
+        <label for="sky-obst">obstruction</label>
+        <input type="number" id="sky-obst" value="0.2" min="0" max="1" step="0.05" style="max-width:5rem">
+        <label for="sky-elev">elev_deg</label>
+        <input type="number" id="sky-elev" value="42" min="-90" max="90" step="0.5" style="max-width:5rem">
+      </div>
+      <div class="form-row">
+        <label for="sky-profile">Integrity</label>
+        <select id="sky-profile" aria-label="LEO-IP vs D integrity">
+          <option value="ASCENT-E-LEO" selected>ASCENT-E-LEO (Starlink IP, light CRC, no P9)</option>
+          <option value="ASCENT-D">ASCENT-D (P9 RS, spool / deep-space)</option>
+          <option value="ASCENT-E">ASCENT-E (plain unit)</option>
+        </select>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-sky-encode">Encode sample</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-sky-insert">Insert into stream</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-sky-canonical">Load golden</button>
+      </div>
+      <p class="status-line" id="sky-status" role="status">PATHHINT is a goodput/CCA hint. Not an RF speed claim.</p>
+      <pre class="hex-dump" id="sky-fields" style="max-height:160px">Fields appear after encode.</pre>
+    </div>
+
     <div class="panel" id="dsim-panel" style="margin-bottom:1rem">
       <div class="panel-title">ASCENT-D deep-space simulator · P9</div>
       <p class="form-hint">Wrap the current unit in an outer frame (<code>D5 E5 C0 DE</code> + profile + ECC params + length + unit + RS codewords). Inject bit errors. Parity fail = erase unit (no mojibake). Browser lab uses real <strong>RS(255,223)</strong> GF(256) matching <code>ref/ascent_d.py</code> / reedsolo (1-byte recovery verified; multi-byte may erase).</p>
@@ -442,7 +486,7 @@
   <section id="install">
     <div class="sec-label">Install</div>
     <h2>Use the codec, not only the lab.</h2>
-    <p class="lede">SPEC <strong>1.0.0-rc1</strong> is frozen for implementers. Package name <strong>ascent-wire</strong> ships on <strong>PyPI</strong> (Python) and <strong>npm</strong> (JavaScript), both 2.0.1+.</p>
+    <p class="lede">SPEC <strong>1.0.0-rc1</strong> is frozen for implementers. Package name <strong>ascent-wire</strong> ships on <strong>PyPI</strong> (Python) and <strong>npm</strong> (JavaScript), both 2.1.0 in-repo (publish gated).</p>
     <div class="grid-2">
       <div class="panel">
         <div class="panel-title">Python (PyPI)</div>
@@ -468,25 +512,26 @@ ascent encode --header --role guide "Hello, Universe."</pre>
 
   <section id="resilience">
     <div class="sec-label">Resilience</div>
-    <h2>Grok over ASCENT over Starlink.</h2>
-    <p class="lede">Dual-mode plan so a terminal stays useful when your fiber dies. Starlink is last-mile IP. ASCENT is the wire. Grok is cloud compute. When the API is gone, edge models take over.</p>
+    <h2>Usable Starlink goodput, not RF slogans.</h2>
+    <p class="lede">Dual-mode plan so a terminal stays useful when your fiber dies. Starlink is last-mile IP. ASCENT is the wire. SkyPulse PATHHINT is foresight for CCA/apps (freeze growth, seed next_capacity). Grok is cloud compute. When the API is gone, edge models take over. ASCENT does not make Starlink faster at RF.</p>
     <div class="grid-2">
       <div class="panel">
         <div class="panel-title">Modes</div>
-        <pre class="code-block">CLOUD  - api.x.ai reachable
+        <pre class="code-block">CLOUD  - api.x.ai reachable, path stable
 EDGE   - local OpenAI-compatible model
-QUEUE  - store-and-forward across flaps
+QUEUE  - obstruction / RTT flap / store-forward
 DEAD   - honest fail (no power / no model)
 
-Stack: TUI -&gt; ASCENT P0+P5 -&gt; optional P9 RS
-       -&gt; TLS -&gt; fiber OR Starlink IP
-       -&gt; api.x.ai OR edge LLM</pre>
+SkyPulse PATHHINT: cap_hint + freeze_ms (goodput, not RF)
+ASCENT-E-LEO: light CRC, no P9 RS on interactive IP
+ASCENT-D: P9 RS for spool / deep-space only</pre>
       </div>
       <div class="panel">
         <div class="panel-title">Docs + skeleton</div>
         <p class="lede" style="margin:0 0 0.75rem">Full design package, kill criteria, and Phase 0-3 roadmap. Phase 1 client skeleton lives in the public repo.</p>
         <div class="cta-row" style="margin-bottom:0">
           <a class="btn btn-sm btn-primary" href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/docs/GROK-ASCENT-STARLINK-ARCHITECTURE.md" rel="noopener">Architecture package</a>
+          <a class="btn btn-sm btn-ghost" href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/docs/SKYPULSE.md" rel="noopener">SkyPulse</a>
           <a class="btn btn-sm btn-ghost" href="https://github.com/Pitchfork-and-Torch/ascent/tree/main/examples/ascent_starlink_client" rel="noopener">Client skeleton</a>
           <a class="btn btn-sm btn-ghost" href="/og.jpg?v=2.1.0" rel="noopener">Tweet card</a>
         </div>
@@ -579,13 +624,13 @@ Stack: TUI -&gt; ASCENT P0+P5 -&gt; optional P9 RS
       <div>
         <strong style="color:var(--text)">ASCENT Nexus</strong> · Wire Lab 2.0<br>
         ASCII Successor with Compatible Encoding of Named Text · MIT · Pitchfork and Torch<br>
-        SPEC <strong style="color:var(--text)">v1.0.0-rc1</strong> · Nexus Wire Lab / architecture card <strong style="color:var(--text)">v2.0.3</strong>
+        SPEC <strong style="color:var(--text)">v1.0.0-rc1</strong> · Nexus Wire Lab / architecture card <strong style="color:var(--text)">v2.1.0</strong>
       </div>
       <div>
         <a href="https://x.com/suddenlyjon" target="_blank" rel="noopener noreferrer">@suddenlyjon</a> ·
         <a href="https://github.com/Pitchfork-and-Torch/ascent">GitHub</a> ·
         <a href="/llms.txt">llms.txt</a> ·
-        <a href="/infographic.png?v=2.0.3">Infographic</a>
+        <a href="/infographic.png?v=2.1.0">Infographic</a>
       </div>
     </div>
     <p style="margin-top:1rem">Keep every classic ASCII byte sacred. Ascend the rest without burning the stairs.</p>

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import struct
+import zlib
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 # ---------------------------------------------------------------------------
@@ -29,6 +30,22 @@ HASH_LEN = {0: 0, 1: 32, 2: 64, 3: 32}
 
 HEADER_MAGIC = b"ASCENT/1.0\n"
 PLANE_P3 = 0x03
+
+# SkyPulse / PATHHINT (additive P2 lead from reserved 0xC4-0xCE). Cont freeze untouched.
+LEAD_SKYSTATE = 0xC5
+PATHHINT_SCHEMA_V1 = 0x01
+PATHHINT_BODY_LEN = 26
+PATHHINT_BODY_LEN_CRC = 30
+PATHHINT_MAX_BODY = 256
+P2_SKIP_CAP = 16384
+FLAG_CAP_KBPS = 0x01
+FLAG_HAS_OBSTRUCTION = 0x02
+FLAG_HAS_ELEV = 0x04
+FLAG_RELATIVE_FREEZE = 0x08
+FLAG_CRC = 0x10
+FLAG_RESERVED_MASK = 0xE0
+ELEV_ABSENT = 0x7FFF
+OBSTRUCTION_ABSENT = 0xFF
 
 # Hex from SPEC.md E.2 (source of truth for interop tests)
 HELLO_UNIVERSE_HEX = (
@@ -553,12 +570,246 @@ def decode_def(body: bytes, start: int) -> Tuple[dict, int]:
     )
 
 
+def crc32_ieee(data: bytes) -> int:
+    """IEEE CRC-32 (ISO-HDLC / zlib). Used for optional PATHHINT light integrity."""
+    return zlib.crc32(data) & 0xFFFFFFFF
+
+
+def encode_pathhint(
+    *,
+    path_id: int = 0,
+    next_capacity_bps: Optional[int] = None,
+    next_capacity_kbps: Optional[int] = None,
+    freeze_ms: int = 0,
+    freeze_until_ms: Optional[int] = None,
+    confidence: float = 0.0,
+    ttl_ms: int = 0,
+    obstruction: Optional[float] = None,
+    elev_deg: Optional[float] = None,
+    crc: bool = False,
+) -> bytes:
+    """Encode a SkyPulse PATHHINT / SKYSTATE unit (P2 lead 0xC5, schema 0x01).
+
+    v1 freeze is relative milliseconds (FLAG_RELATIVE_FREEZE). If freeze_until_ms
+    is supplied without freeze_ms, it is treated as a relative window (not Unix
+    epoch) so goldens stay deterministic.
+    """
+    if path_id < 0 or path_id > 0xFFFFFFFFFFFFFFFF:
+        raise AscentCodecError("path_id out of u64 range")
+    if not (0.0 <= confidence <= 1.0):
+        raise AscentCodecError("confidence must be in [0, 1]")
+    if freeze_ms < 0 or ttl_ms < 0:
+        raise AscentCodecError("freeze_ms and ttl_ms must be >= 0")
+    if freeze_until_ms is not None and freeze_ms == 0:
+        freeze_ms = int(freeze_until_ms)
+    if freeze_ms > 0xFFFFFFFF or ttl_ms > 0xFFFFFFFF:
+        raise AscentCodecError("freeze_ms/ttl_ms exceed u32")
+
+    flags = FLAG_RELATIVE_FREEZE
+    cap_kbps = 0
+    if next_capacity_kbps is not None and next_capacity_bps is not None:
+        raise AscentCodecError("pass next_capacity_bps or next_capacity_kbps, not both")
+    if next_capacity_kbps is not None:
+        flags |= FLAG_CAP_KBPS
+        cap_kbps = int(next_capacity_kbps)
+    elif next_capacity_bps is None:
+        cap_kbps = 0
+    elif next_capacity_bps > 0xFFFFFFFF:
+        flags |= FLAG_CAP_KBPS
+        cap_kbps = (int(next_capacity_bps) + 999) // 1000
+    else:
+        cap_kbps = int(next_capacity_bps)
+    if cap_kbps < 0 or cap_kbps > 0xFFFFFFFF:
+        raise AscentCodecError("next_capacity out of u32 range")
+
+    obst_u8 = OBSTRUCTION_ABSENT
+    if obstruction is not None:
+        if not (0.0 <= obstruction <= 1.0):
+            raise AscentCodecError("obstruction must be in [0, 1]")
+        flags |= FLAG_HAS_OBSTRUCTION
+        obst_u8 = int(round(obstruction * 255.0))
+        if obst_u8 > 255:
+            obst_u8 = 255
+
+    elev_i16 = ELEV_ABSENT
+    if elev_deg is not None:
+        if not (-90.0 <= elev_deg <= 90.0):
+            raise AscentCodecError("elev_deg must be in [-90, 90]")
+        flags |= FLAG_HAS_ELEV
+        elev_i16 = int(round(elev_deg * 10.0))
+        if elev_i16 < -32768 or elev_i16 > 32767 or elev_i16 == ELEV_ABSENT:
+            raise AscentCodecError("elev_deg_x10 unrepresentable")
+
+    if crc:
+        flags |= FLAG_CRC
+
+    conf_u16 = int(round(confidence * 10000.0))
+    if conf_u16 < 0 or conf_u16 > 10000:
+        raise AscentCodecError("confidence quantize out of range")
+
+    body = bytearray()
+    body.append(flags & 0xFF)
+    body += struct.pack(">Q", path_id)
+    body += struct.pack(">I", cap_kbps)
+    body += struct.pack(">I", int(freeze_ms))
+    body += struct.pack(">H", conf_u16)
+    body += struct.pack(">I", int(ttl_ms))
+    body.append(obst_u8)
+    body += struct.pack(">h", elev_i16)
+    if len(body) != PATHHINT_BODY_LEN:
+        raise AscentCodecError("PATHHINT v1 body length bug")
+    if crc:
+        body += struct.pack(">I", crc32_ieee(bytes(body)))
+
+    if len(body) > PATHHINT_MAX_BODY:
+        raise AscentCodecError("PATHHINT body over schema cap")
+    out = bytearray()
+    out.append(LEAD_SKYSTATE)
+    out.append(PATHHINT_SCHEMA_V1)
+    out += struct.pack(">H", len(body))
+    out += body
+    return bytes(out)
+
+
+def _pathhint_skip_event(
+    start: int,
+    end: int,
+    schema: int,
+    reason: str,
+    flags: int = 0,
+    body_len: int = 0,
+) -> dict:
+    return {
+        "kind": "pathhint",
+        "schema": schema,
+        "applied": False,
+        "skipped": True,
+        "reason": reason,
+        "flags": flags,
+        "len": body_len,
+        "offset": start,
+        "end": end,
+    }
+
+
+def _parse_pathhint_v1_body(body: bytes, start: int, end: int, schema: int) -> dict:
+    """Fail-closed: corrupt/unknown => applied=False (unit already skipped by length)."""
+    if len(body) < 1:
+        return _pathhint_skip_event(start, end, schema, "truncated_body", body_len=len(body))
+    flags = body[0]
+    if flags & FLAG_RESERVED_MASK:
+        return _pathhint_skip_event(
+            start, end, schema, "unknown_flags", flags=flags, body_len=len(body)
+        )
+    want = PATHHINT_BODY_LEN_CRC if (flags & FLAG_CRC) else PATHHINT_BODY_LEN
+    if len(body) != want:
+        return _pathhint_skip_event(
+            start, end, schema, "bad_body_len", flags=flags, body_len=len(body)
+        )
+    if flags & FLAG_CRC:
+        got = struct.unpack_from(">I", body, PATHHINT_BODY_LEN)[0]
+        expect = crc32_ieee(body[:PATHHINT_BODY_LEN])
+        if got != expect:
+            return _pathhint_skip_event(
+                start, end, schema, "crc_fail", flags=flags, body_len=len(body)
+            )
+    path_id = struct.unpack_from(">Q", body, 1)[0]
+    cap_raw = struct.unpack_from(">I", body, 9)[0]
+    freeze_ms = struct.unpack_from(">I", body, 13)[0]
+    conf_u16 = struct.unpack_from(">H", body, 17)[0]
+    ttl_ms = struct.unpack_from(">I", body, 19)[0]
+    obst_u8 = body[23]
+    elev_i16 = struct.unpack_from(">h", body, 24)[0]
+    if conf_u16 > 10000:
+        return _pathhint_skip_event(
+            start, end, schema, "confidence_range", flags=flags, body_len=len(body)
+        )
+    if flags & FLAG_CAP_KBPS:
+        next_bps = cap_raw * 1000
+        next_kbps = cap_raw
+    else:
+        next_bps = cap_raw
+        next_kbps = (cap_raw + 999) // 1000 if cap_raw else 0
+    obst = None
+    if flags & FLAG_HAS_OBSTRUCTION:
+        obst = obst_u8 / 255.0
+    elev = None
+    if flags & FLAG_HAS_ELEV and elev_i16 != ELEV_ABSENT:
+        elev = elev_i16 / 10.0
+    return {
+        "kind": "pathhint",
+        "schema": schema,
+        "applied": True,
+        "skipped": False,
+        "reason": "",
+        "flags": flags,
+        "path_id": path_id,
+        "next_capacity_bps": next_bps,
+        "next_capacity_kbps": next_kbps,
+        "freeze_ms": freeze_ms,
+        "freeze_until_ms": freeze_ms,
+        "confidence": conf_u16 / 10000.0,
+        "ttl_ms": ttl_ms,
+        "obstruction": obst,
+        "elev_deg": elev,
+        "crc": bool(flags & FLAG_CRC),
+        "len": len(body),
+        "offset": start,
+        "end": end,
+    }
+
+
+def decode_skystate(body: bytes, start: int) -> Tuple[dict, int]:
+    """Decode P2 0xC5 SKYSTATE. Unknown/corrupt => skip-by-length, applied=False."""
+    i = start + 1
+    if i >= len(body):
+        raise AscentCodecError("truncated SKYSTATE schema")
+    schema = body[i]
+    i += 1
+    blen, i = _u16be(body, i)
+    if blen > P2_SKIP_CAP:
+        raise AscentCodecError("SKYSTATE body over skip cap")
+    if i + blen > len(body):
+        raise AscentCodecError("truncated SKYSTATE body")
+    payload = body[i : i + blen]
+    i += blen
+    if schema != PATHHINT_SCHEMA_V1:
+        return (
+            _pathhint_skip_event(
+                start, i, schema, "unknown_schema", body_len=blen
+            ),
+            i,
+        )
+    if blen > PATHHINT_MAX_BODY:
+        return (
+            _pathhint_skip_event(
+                start, i, schema, "over_schema_cap", body_len=blen
+            ),
+            i,
+        )
+    return _parse_pathhint_v1_body(payload, start, i, schema), i
+
+
+def canonical_pathhint_bytes(*, crc: bool = False) -> bytes:
+    """Lab golden: 50 Mbps goodput *hint* (not an RF claim), 15s freeze, obst 0.20, el 42.0."""
+    return encode_pathhint(
+        path_id=0x42,
+        next_capacity_bps=50_000_000,
+        freeze_ms=15_000,
+        confidence=0.80,
+        ttl_ms=30_000,
+        obstruction=0.20,
+        elev_deg=42.0,
+        crc=crc,
+    )
+
+
 def decode_stream(data: bytes) -> List[dict]:
     """
     Full decode to list of event dicts.
     P0 + ASCENT-V scalars merge into continuous text events
     (kind="text", text=..., offset, end).
-    agent / multimodal (mm_kind) / def / crypto / pad as separate events.
+    agent / multimodal (mm_kind) / def / crypto / pathhint / pad as separate events.
     Never overwrite event kind with numeric wire fields.
     """
     events: List[dict] = []
@@ -628,6 +879,10 @@ def decode_stream(data: bytes) -> List[dict]:
             continue
         if b == 0xC0:
             ev, i = decode_def(data, i)
+            events.append(ev)
+            continue
+        if b == LEAD_SKYSTATE:
+            ev, i = decode_skystate(data, i)
             events.append(ev)
             continue
         if b == 0x9F:

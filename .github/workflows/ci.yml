@@ -23,6 +23,10 @@ jobs:
         env:
           PYTHONPATH: ref
         run: python tests/test_ascent_codec.py
+      - name: SkyPulse PATHHINT goldens
+        env:
+          PYTHONPATH: ref
+        run: python tests/test_skypulse.py
       - name: CLI self-test
         run: python -m ascent self-test
 

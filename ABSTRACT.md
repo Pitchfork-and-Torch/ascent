@@ -11,7 +11,7 @@
 
 ASCENT (ASCII Successor with Compatible Encoding of Named Text) is a byte-stream encoding and control grammar for text, agent directives, multimodal references, quantum-safe control envelopes, and optional deep-space error-corrected frames. Every byte less than `0x80` is classic 7-bit ASCII, bit-identical to ANSI X3.4 / ISO 646 IRV, forever. Higher capability is introduced only through fixed C1 fences, length-prefixed frames, and a clean-room variable-width data plane (ASCENT-V) that does not use UTF-16 surrogate pairs and does not dual-stack UTF-8 on the native wire.
 
-ASCENT is not a marketing rename of Unicode. It is a wire contract: greppable pure-ASCII subsets remain greppable; agents and media share one stream; unknown length-declared units are skipped under caps; deep-space profile D hard-erases units that fail outer parity rather than inventing mojibake.
+ASCENT is not a marketing rename of Unicode. It is a wire contract: greppable pure-ASCII subsets remain greppable; agents and media share one stream; unknown length-declared units are skipped under caps; deep-space profile D hard-erases units that fail outer parity rather than inventing mojibake. SkyPulse PATHHINT (appendix) is LEO path foresight for usable application goodput; it does not increase Starlink physical RF Mbps.
 
 ---
 
@@ -57,6 +57,7 @@ ASCENT is not a marketing rename of Unicode. It is a wire contract: greppable pu
 
 - **ASCENT-7** - pure ASCII identity  
 - **ASCENT-E** - Earth interchange (full control)  
+- **ASCENT-E-LEO** - usage of E: SkyPulse PATHHINT, light integrity on LEO IP (not a parse fork)  
 - **ASCENT-D** - deep-space (RS(255,223) default, MAX_UNIT 8192, ref-prefer MM)  
 - **ASCENT-A** - archive / DEF-heavy  
 
@@ -75,6 +76,8 @@ OuterD: D5 E5 C0 DE | profile | ecc | len | unit | parity
 ```
 
 Initial agent opcodes: STOP, ROLE, TOOL, THINK, HANDOFF, CAP, SAFETY.
+
+SkyPulse PATHHINT (P2 `0xC5` schema `0x01`): path_id, next_capacity, freeze_ms, confidence, ttl, optional obstruction/elev. Fail-closed skip. Optional P9 wrap. Usage profile ASCENT-E-LEO vs ASCENT-D.
 
 Registered companion encryption suite **AEGIR** (design/AEGIR.md) occupies P7 alg ids `0x0100-0x010B` (suite envelope, dual-core hybrid KEM, AEAD, HBOP outer pad, IMS seal, DEMO). No silent downgrade; keys out of band.
 

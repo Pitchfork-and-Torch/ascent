@@ -13,11 +13,11 @@
 
 <p align="center">
   <a href="https://ascent.jonbailey.xyz/">
-    <img src="docs/ascent-infographic.png?v=2.0.3" alt="ASCENT Nexus v2.0.3 infographic: parse law, dual-mode Starlink resilience, Wire Lab 2.0, agents, multimodal, ASCENT-D" width="100%">
+    <img src="docs/ascent-infographic.png?v=2.1.0" alt="ASCENT Nexus v2.1.0 infographic: parse law, SkyPulse PATHHINT, dual-mode Starlink usable-goodput, Wire Lab 2.0, agents, multimodal, ASCENT-D" width="100%">
   </a>
 </p>
 
-<p align="center"><em>ASCENT Nexus v2.0.3 - dual-mode resilience architecture card · <a href="docs/ascent-infographic.png">PNG</a> · <a href="docs/ascent-infographic.jpg">JPG</a> · <a href="https://ascent.jonbailey.xyz/infographic.png?v=2.0.3">live</a></em></p>
+<p align="center"><em>ASCENT Nexus v2.1.0 - SkyPulse PATHHINT architecture card · <a href="docs/ascent-infographic.png">PNG</a> · <a href="docs/ascent-infographic.jpg">JPG</a> · <a href="https://ascent.jonbailey.xyz/infographic.png?v=2.1.0">live</a></em></p>
 
 ---
 
@@ -32,6 +32,7 @@ ASCENT is a **wire encoding and control grammar** for text, agents, multimodal r
 | **Multimodal** | Content-addressed refs and length-declared media units (no surrogate-pair hacks) |
 | **Quantum-safe control** | Append-only algorithm registry; no silent downgrade |
 | **Deep-space (ASCENT-D)** | Outer ECC frames; parity fail erases the unit (no mojibake) |
+| **SkyPulse (PATHHINT)** | LEO path foresight for usable goodput; fail-closed skip; not an RF Mbps upgrade |
 | **Self-describing** | A valid document can carry plane maps, registries, and version history |
 
 This is **not** "Unicode but better." It is a stream contract greppers can still trust.
@@ -40,17 +41,17 @@ This is **not** "Unicode but better." It is a stream contract greppers can still
 
 **https://ascent.jonbailey.xyz/**
 
-**ASCENT Nexus Wire Lab 2.0** (architecture card **v2.0.3**): dual text/hex live sync, agent + multimodal composers, ASCENT-D bit-error / erase-on-fail simulator, AEGIR sketch, interactive eleven-plane explorer, 2-minute tour, SPEC try-this, and codegen. Dual-mode Grok+Starlink resilience plan (CLOUD / EDGE / QUEUE). Sacred P0 meter and Hello, Universe sample included.
+**ASCENT Nexus Wire Lab 2.0** (architecture card **v2.1.0**): dual text/hex live sync, agent + multimodal composers, **SkyPulse PATHHINT** panel (LEO-IP vs D), ASCENT-D bit-error / erase-on-fail simulator, AEGIR sketch, interactive eleven-plane explorer, 2-minute tour, SPEC try-this, and codegen. Dual-mode Grok+Starlink plan (CLOUD / EDGE / QUEUE) with usable-goodput honesty. Sacred P0 meter and Hello, Universe sample included.
 
 Follow: [@suddenlyjon](https://x.com/suddenlyjon)
 
 | Surface | Version |
 |---------|---------|
-| Nexus site / architecture card | **2.0.3** |
-| SPEC | **1.0.0-rc1** |
+| Nexus site / architecture card | **2.1.0** |
+| SPEC | **1.0.0-rc1** (+ SkyPulse appendix) |
 | Frozen Cont packing (ASCENT-V) | Cont `0xA0-0xBF` (5-bit) |
-| Python package (PyPI) | **ascent-wire 2.0.2** |
-| JS package (npm) | **ascent-wire 2.0.2** |
+| Python package (PyPI) | **ascent-wire 2.1.0** |
+| JS package (npm) | **ascent-wire 2.1.0** |
 
 ## Quick start
 
@@ -86,6 +87,19 @@ python tests/test_ascent_d_satellite.py
 ```
 
 Module: `ref/ascent_d.py`.
+
+### SkyPulse PATHHINT (LEO usable goodput)
+
+Fail-closed path hint for Starlink-class IP. **Does not raise RF Mbps.**
+
+```bash
+set PYTHONPATH=ref
+python tests/test_skypulse.py
+python -m ascent pathhint --profile ASCENT-E-LEO
+python examples/ascent_starlink_client/daemon.py --pathhint
+```
+
+Docs: [docs/SKYPULSE.md](docs/SKYPULSE.md). Profile note: **ASCENT-E-LEO** (light CRC, no P9 RS on interactive IP) vs **ASCENT-D** (spool/deep-space).
 
 ### AEGIR (ASCENT-native encryption companion)
 
@@ -135,6 +149,7 @@ Full hex map: [SPEC.md section E](SPEC.md).
 |---------|------|
 | `ASCENT-7` | Pure classic ASCII identity |
 | `ASCENT-E` | Earth / general interchange |
+| `ASCENT-E-LEO` | Usage of E: PATHHINT + light integrity on LEO IP |
 | `ASCENT-D` | Deep-space outer ECC |
 | `ASCENT-A` | Archive / self-description heavy |
 
@@ -158,6 +173,7 @@ set PYTHONPATH=ref
 python tests/test_ascent_codec.py
 node tests/run_js_lock.js
 python tests/test_js_python_lock.py
+python tests/test_skypulse.py
 ```
 
 ## Agent loops
@@ -171,10 +187,11 @@ SPEC.md                 Normative draft (sections A-F)
 ABSTRACT.md             One-page abstract
 ascent/                 Installable package (ascent-wire)
 pyproject.toml          Packaging
-docs/                   Infographic, agent-loop, SPEC freeze RC
+docs/                   Infographic, SkyPulse, agent-loop, SPEC freeze RC
 ref/ascent_decode.py    Earth-profile reference decoder
+ref/ascent_skypulse.py  PATHHINT policy + LEO-IP vs D integrity
 ref/aegir_sketch.py     AEGIR encrypt/decrypt sketch (DEMO + optional DCH-768)
-examples/               Canonical .bin samples
+examples/               Canonical .bin samples (incl. skypulse-pathhint)
 site/public/            Live Nexus Wire Lab 2.0 (Cloudflare Pages)
 tests/                  Python goldens + JS lock
 design/                 Non-normative design provenance (incl. AEGIR)
@@ -185,8 +202,10 @@ assets/masters/         Source OG + infographic masters
 |------|---------|
 | [SPEC.md](SPEC.md) | Full normative draft |
 | [ABSTRACT.md](ABSTRACT.md) | RFC-style one-pager |
-| [docs/ascent-infographic.png](docs/ascent-infographic.png) | Architecture infographic v2.0.3 (dual-mode plan) |
+| [docs/ascent-infographic.png](docs/ascent-infographic.png) | Architecture infographic v2.1.0 (SkyPulse; PNG may still show 2.0.3 until regen) |
+| [docs/SKYPULSE.md](docs/SKYPULSE.md) | SkyPulse PATHHINT what/why/non-claims |
 | [docs/GROK-ASCENT-STARLINK-ARCHITECTURE.md](docs/GROK-ASCENT-STARLINK-ARCHITECTURE.md) | Grok over ASCENT over Starlink design package |
+| [docs/ORBITSTACK-LEOAWARE-BRIDGE.md](docs/ORBITSTACK-LEOAWARE-BRIDGE.md) | How LeoAware should consume PATHHINT |
 | [docs/ascent-starlink-interface.png](docs/ascent-starlink-interface.png) | Horizontal ASCENT x Starlink interface map (2400x1100) |
 | [examples/ascent_starlink_client/](examples/ascent_starlink_client/) | Dual-mode CLI skeleton (cloud / edge / queue) |
 | [docs/AGENT-LOOP.md](docs/AGENT-LOOP.md) | LLM agent loop guide |

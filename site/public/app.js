@@ -47,7 +47,7 @@
       name: "Escape nucleus",
       role: "Length-prefixed ops / DEF",
       detail:
-        "C0 DEF documents and C1 AGENT_OP headers carry versioned, length-declared operations so unknowns can be skipped safely.",
+        "C0 DEF documents, C1 AGENT_OP, and C5 SKYSTATE/PATHHINT (SkyPulse) are length-declared so unknowns can be skipped safely. PATHHINT is a LEO goodput hint, not an RF Mbps upgrade.",
       example: "hello",
     },
     {
@@ -127,6 +127,7 @@
     { id: "aegir", label: "AEGIR envelope", build: buildAegir },
     { id: "deep", label: "Deep-space packet", build: buildDeep },
     { id: "skybrary", label: "Skybrary pack seal", build: buildSkybrarySeal },
+    { id: "skypulse", label: "SkyPulse PATHHINT", build: buildSkyPulse },
     { id: "mixed", label: "Human+agent+media", build: buildMixed },
   ];
 
@@ -167,6 +168,12 @@
         "Integrity seal for an open Skybrary starter pack: JSON with <code>root_sha256</code>, wrapped in ASCENT-D. Decode, match the zip hash, refuse on mismatch. Live packs: skycache.jonbailey.xyz/library/",
       sample: "skybrary",
     },
+    {
+      title: "7 · SkyPulse PATHHINT",
+      body:
+        "LEO usable goodput: a PATHHINT unit seeds next_capacity and freeze_ms so apps/CCA waste fewer retransmits. Not an RF Mbps claim. Fail-closed skip on corrupt hints. Toggle ASCENT-E-LEO vs D in the SkyPulse panel.",
+      sample: "skypulse",
+    },
   ];
 
   var SPEC_SECTIONS = [
@@ -206,10 +213,17 @@
       sample: "deep",
     },
     {
+      id: "skypulse",
+      label: "SkyPulse",
+      html:
+        "<h3>SkyPulse PATHHINT (P2 0xC5)</h3><p>Additive SKYSTATE unit. Schema 0x01 carries path_id, next_capacity_bps, freeze_ms, confidence, ttl, optional obstruction/elev. Fail-closed skip. ASCENT-E-LEO: light CRC, no P9 on interactive Starlink IP. Does <strong>not</strong> raise RF Mbps.</p><pre>0xC5 schema:u8 len:u16be body\nflags path_id:u64be cap:u32be freeze:u32be\nconf:u16be ttl:u32be obst:u8 elev:i16be [crc32]</pre>",
+      sample: "skypulse",
+    },
+    {
       id: "profiles",
       label: "Profiles",
       html:
-        "<h3>Profiles</h3><p><strong>ASCENT-7</strong> pure identity · <strong>ASCENT-E</strong> Earth interchange · <strong>ASCENT-D</strong> deep-space ECC · <strong>ASCENT-A</strong> archive / DEF-heavy.</p>",
+        "<h3>Profiles</h3><p><strong>ASCENT-7</strong> pure identity · <strong>ASCENT-E</strong> Earth interchange · <strong>ASCENT-E-LEO</strong> usage of E (PATHHINT, light integrity) · <strong>ASCENT-D</strong> deep-space ECC · <strong>ASCENT-A</strong> archive / DEF-heavy.</p>",
       sample: "hello",
     },
   ];
@@ -345,6 +359,20 @@
     return D.encodeP9(unit, { profile: D.PROFILE_D });
   }
 
+  function buildSkyPulse() {
+    if (C.canonicalPathhintBytes) return C.canonicalPathhintBytes(false);
+    return C.encodePathhint({
+      pathId: 66,
+      nextCapacityBps: 50000000,
+      freezeMs: 15000,
+      confidence: 0.8,
+      ttlMs: 30000,
+      obstruction: 0.2,
+      elevDeg: 42,
+      crc: false,
+    });
+  }
+
   /** Skybrary Starter Trio literacy pack seal (schema skybrary-seal/1). */
   function buildSkybrarySeal() {
     var seal = {
@@ -457,7 +485,7 @@
     if (b === 0x9a || b === 0x9b) return "agent";
     if (b === 0x9d || b === 0x4d) return "mm";
     if (b === 0x9c || b === 0x4b) return "crypto";
-    if (b === 0xc0 || b === 0xc1) return "p2";
+    if (b === 0xc1 || b === 0xc5) return "p2";
     if (b >= 0xa0 && b <= 0xbf) return "cont";
     if (b >= 0x80 && b <= 0x9f) return "p1";
     return "ext";
@@ -603,6 +631,7 @@
       card(kinds.agent || 0, "agent") +
       card(kinds.multimodal || 0, "multimodal") +
       card(kinds.crypto || 0, "crypto") +
+      card(kinds.pathhint || 0, "pathhint") +
       card(state.profile, "profile");
   }
 
@@ -874,6 +903,30 @@
           "</p><p>" +
           bodyBits +
           "</p>";
+      } else if (type === "pathhint") {
+        var applied = e.applied ? "APPLIED" : "SKIP " + (e.reason || "");
+        var cap = e.nextCapacityBps != null ? e.nextCapacityBps : e.next_capacity_bps;
+        var freeze = e.freezeMs != null ? e.freezeMs : e.freeze_ms;
+        var obst = e.obstruction == null ? "na" : Number(e.obstruction).toFixed(2);
+        var el = e.elevDeg != null ? e.elevDeg : e.elev_deg;
+        card.innerHTML =
+          '<div class="ev-label">PATHHINT · ' +
+          escapeHtml(applied) +
+          "</div><p>path_id <code>" +
+          escapeHtml(String(e.pathId != null ? e.pathId : e.path_id)) +
+          "</code> · cap_hint " +
+          escapeHtml(String(cap)) +
+          " bps · freeze " +
+          escapeHtml(String(freeze)) +
+          " ms · conf " +
+          escapeHtml(String(e.confidence)) +
+          "</p><p>obst " +
+          escapeHtml(String(obst)) +
+          " · el " +
+          escapeHtml(String(el == null ? "na" : el)) +
+          " deg · ttl " +
+          escapeHtml(String(e.ttlMs != null ? e.ttlMs : e.ttl_ms)) +
+          " ms</p><p class=\"form-hint\">Goodput/CCA hint. Not a Starlink RF Mbps claim.</p>";
       } else if (type === "crypto") {
         card.innerHTML =
           '<div class="ev-label">CRYPTO · alg 0x' +
@@ -1614,7 +1667,17 @@
       state.profile = sel.value;
       var non = document.getElementById("opt-nonascii");
       if (state.profile === "7" && non) non.value = "reject";
-      if (state.profile === "E" && non && non.value === "reject") non.value = "v";
+      if (state.profile === "E" || state.profile === "E-LEO") {
+        if (non && non.value === "reject") non.value = "v";
+      }
+      if (state.profile === "E-LEO") {
+        var skySel = document.getElementById("sky-profile");
+        if (skySel) skySel.value = "ASCENT-E-LEO";
+      }
+      if (state.profile === "D") {
+        var skySelD = document.getElementById("sky-profile");
+        if (skySelD) skySelD.value = "ASCENT-D";
+      }
       renderAll({ flash: false });
       var st = document.getElementById("encode-status");
       if (st) {
@@ -1757,6 +1820,115 @@
     }
   }
 
+  function wireSkyPulse() {
+    function readOpts() {
+      var obstEl = document.getElementById("sky-obst");
+      var elevEl = document.getElementById("sky-elev");
+      var obstRaw = obstEl ? obstEl.value : "";
+      var elevRaw = elevEl ? elevEl.value : "";
+      return {
+        pathId: parseInt((document.getElementById("sky-path-id") || {}).value, 10) || 0,
+        nextCapacityBps: parseInt((document.getElementById("sky-cap") || {}).value, 10) || 0,
+        freezeMs: parseInt((document.getElementById("sky-freeze") || {}).value, 10) || 0,
+        confidence: parseFloat((document.getElementById("sky-conf") || {}).value) || 0,
+        ttlMs: parseInt((document.getElementById("sky-ttl") || {}).value, 10) || 0,
+        obstruction: obstRaw === "" ? null : parseFloat(obstRaw),
+        elevDeg: elevRaw === "" ? null : parseFloat(elevRaw),
+      };
+    }
+    function encodeCurrent() {
+      var profile = (document.getElementById("sky-profile") || {}).value || "ASCENT-E-LEO";
+      var pol = C.recommendIntegrity ? C.recommendIntegrity(profile) : { wrapP9: false, usePathhintCrc: false, note: "" };
+      var opts = readOpts();
+      opts.crc = !!pol.usePathhintCrc;
+      var unit = C.encodePathhint(opts);
+      if (pol.wrapP9 && D && D.encodeP9) {
+        unit = D.encodeP9(unit, { profile: D.PROFILE_D });
+      }
+      return { unit: unit, pol: pol, profile: profile };
+    }
+    function showFields(unit, pol) {
+      var pre = document.getElementById("sky-fields");
+      var st = document.getElementById("sky-status");
+      var inner = unit;
+      var p9note = "";
+      if (D && D.decodeP9 && unit.length >= 4 && unit[0] === 0xd5) {
+        var dec = D.decodeP9(unit);
+        if (dec && dec.status === "ok" && dec.frame) {
+          inner = dec.frame.unit;
+          p9note = "P9 wrap ok. Inner PATHHINT below.\n";
+        }
+      }
+      var ev = C.decodeStream(inner);
+      var hint = null;
+      for (var i = 0; i < ev.length; i++) {
+        if (ev[i].kind === "pathhint") hint = ev[i];
+      }
+      if (pre) {
+        pre.textContent =
+          p9note +
+          (pol && pol.note ? pol.note + "\n\n" : "") +
+          (hint ? JSON.stringify(hint, null, 2) : "no PATHHINT decoded") +
+          "\n\nhex " +
+          C.hexOf(unit).toUpperCase();
+      }
+      if (st) {
+        st.textContent = hint && hint.applied
+          ? "PATHHINT applied. cap_hint is goodput seed, not RF Mbps. profile " + (pol && pol.profile)
+          : "PATHHINT skipped (" + ((hint && hint.reason) || "none") + "). Fail-closed.";
+        st.className = "status-line " + (hint && hint.applied ? "ok" : "warn");
+      }
+    }
+    var enc = document.getElementById("btn-sky-encode");
+    if (enc) {
+      enc.addEventListener("click", function () {
+        try {
+          var r = encodeCurrent();
+          setStream(r.unit, { forceText: true, flash: true });
+          showFields(r.unit, r.pol);
+        } catch (e) {
+          var st = document.getElementById("sky-status");
+          if (st) {
+            st.textContent = "Encode error: " + e.message;
+            st.className = "status-line err";
+          }
+        }
+      });
+    }
+    var ins = document.getElementById("btn-sky-insert");
+    if (ins) {
+      ins.addEventListener("click", function () {
+        try {
+          var r = encodeCurrent();
+          insertBytes(r.unit, "append");
+          showFields(r.unit, r.pol);
+        } catch (e) {
+          alert("PATHHINT error: " + e.message);
+        }
+      });
+    }
+    var can = document.getElementById("btn-sky-canonical");
+    if (can) {
+      can.addEventListener("click", function () {
+        loadGallery("skypulse");
+        var unit = buildSkyPulse();
+        var pol = C.recommendIntegrity("ASCENT-E-LEO");
+        showFields(unit, pol);
+      });
+    }
+    var sel = document.getElementById("sky-profile");
+    if (sel) {
+      sel.addEventListener("change", function () {
+        var pol = C.recommendIntegrity(sel.value);
+        var st = document.getElementById("sky-status");
+        if (st) {
+          st.textContent = pol.note;
+          st.className = "status-line ok";
+        }
+      });
+    }
+  }
+
   // ---------- main wire ----------
 
   function wireUi() {
@@ -1767,6 +1939,7 @@
     wireAgentComposer();
     wireMmComposer();
     wireAegir();
+    wireSkyPulse();
     wireDsim();
     wireCodegen();
     wireExport();
@@ -1818,7 +1991,7 @@
     }
 
     window.ASCENT = {
-      version: "2.0.0-nexus",
+      version: "2.1.0-skypulse",
       getState: function () {
         return state;
       },

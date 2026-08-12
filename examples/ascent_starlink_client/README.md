@@ -1,34 +1,47 @@
-# ascent_starlink_client (Phase 1)
+# ascent_starlink_client (Phase 1 + SkyPulse)
 
-Dual-mode Grok session framed as ASCENT over ordinary IP (fiber or Starlink).
+Dual-mode Grok session framed as ASCENT over ordinary IP (fiber or Starlink),
+with **SkyPulse PATHHINT** for LEO session continuity.
 
 ## Honest scope
 
-- **Does:** encode turns as ASCENT; call cloud API when reachable; fall back to local OpenAI-compatible edge model; spool when offline; flush queue when cloud returns; optional ASCENT-D P9 wrap; dish TCP probe opt-in.
-- **Does not:** reverse-engineer Dishy RF; run frontier Grok offline; replace Starlink networking.
+- **Does:** encode turns as ASCENT; emit PATHHINT (next_capacity / freeze / obstruction);
+  call cloud API when reachable; fall back to local OpenAI-compatible edge model;
+  **QUEUE** when obstruction or RTT flaps; flush queue when the path is stable;
+  optional ASCENT-D P9 wrap for spool/deep-space; dish TCP probe opt-in.
+- **Does not:** raise Starlink physical RF Mbps; reverse-engineer Dishy RF;
+  run frontier Grok offline; replace Starlink networking; claim dual-gate LeoAware product wins.
 
-See `docs/GROK-ASCENT-STARLINK-ARCHITECTURE.md`.
+See `docs/GROK-ASCENT-STARLINK-ARCHITECTURE.md`, `docs/SKYPULSE.md`,
+and `docs/ORBITSTACK-LEOAWARE-BRIDGE.md`.
+
+Default integrity profile is **ASCENT-E-LEO**: light PATHHINT CRC, no P9 RS on
+interactive IP (avoid double-FEC tax). Use `--ascent-d` / `--profile ASCENT-D`
+only for spool or deep-space.
 
 ## Run
 
-```powershell
-cd $env:USERPROFILE\Projects\next-ascii
-$env:PYTHONPATH = ".;ref;examples\ascent_starlink_client"
+```bash
+cd /path/to/ascent
+PYTHONPATH=".:ref:examples/ascent_starlink_client"
 # optional cloud:
-# $env:XAI_API_KEY = "..."
+# export XAI_API_KEY="..."
 # optional edge:
-# $env:EDGE_BASE_URL = "http://127.0.0.1:11434/v1"
-# $env:EDGE_MODEL = "llama3.1:8b"
+# export EDGE_BASE_URL="http://127.0.0.1:11434/v1"
 # optional dish LAN probe:
-# $env:STARLINK_PROBE = "1"
+# export STARLINK_PROBE=1
+# lab obstruction / QUEUE drill:
+# export ASCENT_OBSTRUCTION=0.40
+# export ASCENT_DISH_STATE=OBSTRUCTED
 
-py -3 examples\ascent_starlink_client\daemon.py --status
-py -3 examples\ascent_starlink_client\daemon.py --once "ping"
-py -3 examples\ascent_starlink_client\daemon.py --once "ping" --ascent-d
-py -3 examples\ascent_starlink_client\daemon.py --flush
+python examples/ascent_starlink_client/daemon.py --status
+python examples/ascent_starlink_client/daemon.py --pathhint
+python examples/ascent_starlink_client/daemon.py --once "ping"
+python examples/ascent_starlink_client/daemon.py --once "ping" --ascent-d
+python examples/ascent_starlink_client/daemon.py --flush
 ```
 
-Interactive: run without `--once`. Type `/status` or `/flush` at the prompt.
+Interactive: run without `--once`. Type `/status`, `/flush`, or `/pathhint`.
 
 ## Env
 
@@ -42,14 +55,23 @@ Interactive: run without `--once`. Type `/status` or `/flush` at the prompt.
 | `ASCENT_CLOUD_TIMEOUT` | seconds (default 45) |
 | `ASCENT_EDGE_TIMEOUT` | seconds (default 8) |
 | `STARLINK_PROBE=1` | TCP probe dish `:9200` |
+| `ASCENT_OBSTRUCTION` | 0..1 lab obstruction fraction |
+| `ASCENT_ELEV_DEG` | lab elevation |
+| `ASCENT_DISH_STATE` | ONLINE / OBSTRUCTED / ... lab override |
+| `ASCENT_PATH_CAP_BPS` | PATHHINT next_capacity seed (goodput hint) |
+| `ASCENT_FREEZE_MS` | PATHHINT growth-freeze window |
+| `ASCENT_INTEGRITY_PROFILE` | `ASCENT-E-LEO` (default) or `ASCENT-D` |
 
 ## Modes
 
 | Mode | Meaning |
 |------|---------|
-| CLOUD | `api.x.ai` answered |
+| CLOUD | `api.x.ai` answered **and** path is stable |
 | EDGE | Local model answered (banner printed) |
-| QUEUE | Outbound ADUs under `./spool/` until flush |
+| QUEUE | Obstruction / RTT flap, or no brain: spool ADUs under `./spool/` |
 | DEAD | No brain available |
+
+Sacred-meter includes a PATHHINT fragment (`cap_hint=...Mbps freeze=...`). That
+number is an **application goodput hint**, not a Starlink RF measurement.
 
 ASCII-only status lines. No em/en dashes.

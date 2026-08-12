@@ -2,14 +2,18 @@
 
 | File | Use |
 |------|-----|
-| [ascent-infographic.png](ascent-infographic.png) | Full architecture card v2.0.0 (README + site) |
+| [ascent-infographic.png](ascent-infographic.png) | Full architecture card v2.1.0 (README + site; regen PNG on deploy) |
 | [ascent-infographic.jpg](ascent-infographic.jpg) | JPEG twin |
 | [ascent-infographic-banner.jpg](ascent-infographic-banner.jpg) | Wide header / social crop |
 | [series/](series/) | 8-panel integration explainer series |
+| [SKYPULSE.md](SKYPULSE.md) | PATHHINT / SKYSTATE: what, why, non-claims |
+| [GROK-ASCENT-STARLINK-ARCHITECTURE.md](GROK-ASCENT-STARLINK-ARCHITECTURE.md) | Grok + ASCENT + Starlink dual-mode plan |
+| [ORBITSTACK-LEOAWARE-BRIDGE.md](ORBITSTACK-LEOAWARE-BRIDGE.md) | LeoAware PATHHINT consume rules |
+| [RELEASE-2.1.0.md](RELEASE-2.1.0.md) | In-repo release notes draft (no publish) |
 | [AGENT-LOOP.md](AGENT-LOOP.md) | LLM agent loop guide |
 | [SPEC-FREEZE-1.0-RC.md](SPEC-FREEZE-1.0-RC.md) | 1.0-RC freeze checklist |
 
-**Current card:** ASCENT Nexus Wire Lab 2.0 · architecture **v2.0.0**
+**Current card:** ASCENT Nexus Wire Lab 2.0 · architecture **v2.1.0** (SkyPulse)
 
 ## Integration series (Desktop + docs)
 

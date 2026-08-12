@@ -1,7 +1,7 @@
 ﻿{
   "name": "ascent-wire",
-  "version": "2.0.2",
-  "description": "ASCENT wire codec (browser/Node) - frozen Cont packing, agent/MM frames, RS(255,223) ASCENT-D lab. Pitchfork-and-Torch.",
+  "version": "2.1.0",
+  "description": "ASCENT wire codec (browser/Node) - frozen Cont packing, agent/MM frames, SkyPulse PATHHINT, RS(255,223) ASCENT-D lab. Pitchfork-and-Torch.",
   "license": "MIT",
   "type": "commonjs",
   "main": "index.js",

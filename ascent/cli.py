@@ -11,11 +11,14 @@ from pathlib import Path
 def main(argv: list[str] | None = None) -> int:
     from ascent import (
         __version__,
+        canonical_pathhint_bytes,
         decode_stream,
+        encode_pathhint,
         encode_text,
         events_to_jsonable,
         hello_universe_bytes,
         HELLO_UNIVERSE_HEX,
+        recommend_integrity,
     )
 
     p = argparse.ArgumentParser(
@@ -45,6 +48,17 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("hello", help="Print Hello, Universe sample hex")
     sub.add_parser("self-test", help="Decode Hello, Universe and check units")
     sub.add_parser("version", help="Print package version")
+    ph = sub.add_parser("pathhint", help="Encode/decode a SkyPulse PATHHINT unit")
+    ph.add_argument("--decode", metavar="HEX", help="Decode PATHHINT hex")
+    ph.add_argument("--crc", action="store_true", help="Attach light CRC (LEO-IP)")
+    ph.add_argument("--path-id", type=int, default=66)
+    ph.add_argument("--cap-bps", type=int, default=50_000_000)
+    ph.add_argument("--freeze-ms", type=int, default=15000)
+    ph.add_argument("--confidence", type=float, default=0.8)
+    ph.add_argument("--ttl-ms", type=int, default=30000)
+    ph.add_argument("--obstruction", type=float, default=0.2)
+    ph.add_argument("--elev", type=float, default=42.0)
+    ph.add_argument("--profile", default="ASCENT-E-LEO", help="Integrity profile note")
 
     args = p.parse_args(argv)
 
@@ -62,7 +76,10 @@ def main(argv: list[str] | None = None) -> int:
         kinds = [ev["kind"] for ev in events]
         assert kinds == ["text", "agent", "multimodal"], kinds
         assert data.hex().upper() == HELLO_UNIVERSE_HEX.upper()
-        print("SELF-TEST PASS", len(data), "bytes", kinds)
+        hint = canonical_pathhint_bytes()
+        hev = decode_stream(hint)
+        assert hev[0]["kind"] == "pathhint" and hev[0]["applied"] is True
+        print("SELF-TEST PASS", len(data), "bytes", kinds, "+ PATHHINT", len(hint), "B")
         return 0
 
     if args.cmd == "encode":
@@ -111,8 +128,47 @@ def main(argv: list[str] | None = None) -> int:
                         ev.get("kindName"),
                         ev.get("ref") or ev.get("text") or "",
                     )
+                elif kind == "pathhint":
+                    print(
+                        "PATHHINT:",
+                        "applied=" + str(ev.get("applied")),
+                        "path_id=" + str(ev.get("path_id")),
+                        "cap_bps=" + str(ev.get("next_capacity_bps")),
+                        "reason=" + str(ev.get("reason") or ""),
+                    )
                 else:
                     print(kind.upper() + ":", ev)
+        return 0
+
+    if args.cmd == "pathhint":
+        pol = recommend_integrity(args.profile) if recommend_integrity else {}
+        if args.decode:
+            clean = args.decode.replace(" ", "").replace("\n", "").replace("0x", "")
+            events = decode_stream(bytes.fromhex(clean))
+            print(json.dumps(events_to_jsonable(events), indent=2))
+            return 0
+        use_crc = args.crc or (pol.get("use_pathhint_crc") if pol else False)
+        wire = encode_pathhint(
+            path_id=args.path_id,
+            next_capacity_bps=args.cap_bps,
+            freeze_ms=args.freeze_ms,
+            confidence=args.confidence,
+            ttl_ms=args.ttl_ms,
+            obstruction=args.obstruction,
+            elev_deg=args.elev,
+            crc=bool(use_crc),
+        )
+        print(wire.hex().upper())
+        if pol:
+            print(
+                "# profile",
+                pol.get("profile"),
+                "mode",
+                pol.get("mode"),
+                "wrap_p9",
+                pol.get("wrap_p9"),
+                file=sys.stderr,
+            )
         return 0
 
     return 1

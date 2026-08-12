@@ -1,10 +1,10 @@
 # Grok over ASCENT over Starlink
 
 **Title:** Resilient terminal Grok via ASCENT on Starlink (and beyond)  
-**Status:** Research synthesis + implementable architecture (v0.1)  
-**Date:** 2026-08-01  
+**Status:** Research synthesis + implementable architecture (v0.2, SkyPulse)  
+**Date:** 2026-08-12  
 **Scope:** Public evidence only. Legal stock Starlink kit. No RF hacks.  
-**Product hooks:** Pitchfork-and-Torch/ascent SPEC 1.0.0-rc1, `ascent-wire`, live Wire Lab.
+**Product hooks:** Pitchfork-and-Torch/ascent SPEC 1.0.0-rc1, `ascent-wire` 2.1.0, SkyPulse PATHHINT, live Wire Lab.
 
 ASCII hyphens only in this document.
 
@@ -24,9 +24,34 @@ Three layers people collapse into one slogan:
 
 **Not achievable as a consumer product today:** Full cloud Grok while "worldwide terrestrial Internet is completely unavailable." That scenario almost certainly kills gateways, PoPs, and xAI DCs. ISLs do not host Grok.
 
-**One sentence:** Starlink keeps you on the public Internet when *your* last mile dies; ASCENT keeps sessions and payloads honest when the link is ugly; only local models keep a brain when the public Internet (and therefore xAI) is actually gone.
+**One sentence:** Starlink keeps you on the public Internet when *your* last mile dies; ASCENT keeps sessions and payloads honest when the link is ugly; SkyPulse PATHHINT gives CCA/apps a fail-closed freeze/capacity seed so LEO flaps waste fewer retransmits; only local models keep a brain when the public Internet (and therefore xAI) is actually gone.
+
+**SkyPulse does not make Starlink faster at RF.** It improves *usable* goodput and session continuity.
 
 ---
+
+## 0. SkyPulse (PATHHINT) on Starlink IP
+
+Priority for this architecture: **usable application goodput**, not PHY Mbps slogans.
+
+| Piece | Role |
+|-------|------|
+| PATHHINT / SKYSTATE `0xC5` schema `0x01` | Compact hint: path_id, next_capacity_bps, freeze_ms, confidence, ttl, optional obstruction/elev |
+| Fail-closed | Corrupt/unknown => skip; never apply a bad hint to CCA |
+| ASCENT-E-LEO | Usage profile of E: light CRC or none; **no P9 RS** on interactive IP |
+| ASCENT-D | Keep for spool / deep-space; RS(255,223) erase-on-fail |
+| QUEUE | Daemon mode when obstruction or RTT flaps; CLOUD/EDGE still name the brain honestly |
+
+LeoAware (OrbitStack) should consume PATHHINT as: freeze **growth**, seed next_capacity, fail-closed skip. **Never** gate `loss_burst` REPROBE on the hint. Absolute dual-gate remains a paid OrbitStack product fence. See `docs/SKYPULSE.md` and `docs/ORBITSTACK-LEOAWARE-BRIDGE.md`.
+
+Canonical lab unit (50 Mbps is a *hint*, not a dish measurement):
+
+```
+c5 01 00 1a 0e 00 00 00 00 00 00 00 42 02 fa f0 80 ...
+```
+
+Python: `encode_pathhint` / `canonical_pathhint_bytes` in `ref/ascent_codec.py`.
+
 
 ## 1. Research dossier
 
@@ -42,7 +67,7 @@ Three layers people collapse into one slogan:
 | **P8** | DEF self-maps | Profile negotiation, ECC table, freeze mid-cruise |
 | **P9 / ASCENT-D** | Outer sync `D5 E5 C0 DE` + **RS(255,223)** GF(256) | Erase-on-parity-fail; no mojibake agents; I=8 default |
 
-**Profiles:** ASCENT-7 (identity ASCII) | ASCENT-E (Earth) | ASCENT-D (deep outer) | ASCENT-A (archive).
+**Profiles:** ASCENT-7 (identity ASCII) | ASCENT-E (Earth) | **ASCENT-E-LEO** (usage of E: PATHHINT, light integrity) | ASCENT-D (deep outer) | ASCENT-A (archive).
 
 **Fail policy (D):** parity/CRC fail => **erase unit**. Never soft-fill corrupt TOOL/SAFETY.
 
@@ -78,7 +103,7 @@ Three layers people collapse into one slogan:
 - **True deep space later:** ASCENT as **bundle ADU** (A) + ASCENT-D E2E (C) + LTP red-part / optional ECLSA + CCSDS link coding.  
 - **Reject:** ASCENT as a custom convergence-layer codec (breaks ION/HDTN/uD3TN interop).
 
-**FEC note:** RS(255,223) rate ~0.875 matches classical CCSDS outer RS (t=16 errors / up to 32 erasures). ASCENT-D does **not** replace TM LDPC/turbo or LTP ARQ. Soft-decision LDPC/turbo beat hard RS on AWGN; RS + erase-on-fail wins for fail-closed agent safety on short ADUs.
+**FEC note:** RS(255,223) rate ~0.875 matches classical CCSDS outer RS (t=16 errors / up to 32 erasures). ASCENT-D does **not** replace TM LDPC/turbo or LTP ARQ. On **Starlink IP**, do not stack P9 RS on top of PHY+TLS (double-FEC tax). Soft-decision LDPC/turbo beat hard RS on AWGN; RS + erase-on-fail wins for fail-closed agent safety on short **spool / deep-space** ADUs. PATHHINT optional IEEE CRC-32 is integrity, not FEC.
 
 **Sources:** RFC 9171 BPv7, RFC 5326 LTP, CCSDS 131.0-B TM coding, ION/HDTN/uD3TN public trees. Confidence: High for standards; Medium for ECLSA packaging.
 
@@ -106,8 +131,8 @@ Three layers people collapse into one slogan:
                          | sacred-meter      |
                          +---------+---------+
                                    |
-                    ASCENT stream (P0+P5+P6+P7)
-                    optional P9 ASCENT-D wrap
+                    ASCENT stream (P0+P5+P6+P7 + SkyPulse PATHHINT)
+                    optional P9 ASCENT-D wrap (spool/D only)
                                    |
                          +---------v---------+
                          | Transport adapter |
@@ -136,8 +161,8 @@ Physical / RF (stock Starlink kit) or optical ISL (SpaceX internal)
     -> IP (Starlink provides)
         -> TLS 1.3 / QUIC (session crypto)
             -> optional app store-and-forward queue
-                -> ASCENT wire (P0 prose + P5 agent + P6 REF + P7)
-                    -> optional ASCENT-D P9 RS(255,223) erase-on-fail
+                -> ASCENT wire (P0 prose + P5 agent + P6 REF + P7 + PATHHINT)
+                    -> optional ASCENT-D P9 RS(255,223) erase-on-fail (not default on Starlink IP)
                         -> Grok session logic / local runtime
 ```
 
@@ -147,7 +172,7 @@ Physical / RF (stock Starlink kit) or optical ISL (SpaceX internal)
 |------|------|-------|
 | **CLOUD** | `api.x.ai` reachable | Full Grok |
 | **EDGE** | WAN up but API down, or forced offline | Local quantized model |
-| **QUEUE** | Link flapping / rain / 15s reconfig glitches | Buffer ASCENT ADUs; flush on stable RTT |
+| **QUEUE** | Link flapping / rain / 15s reconfig / PATHHINT obstruction | Buffer ASCENT ADUs; flush on stable RTT |
 | **DEAD** | No power / no sky / no model | Honest UX: cannot help until power or local model loads |
 
 ---
@@ -212,6 +237,21 @@ DEF-lite: profile=E mode=cloud last_good_turn=41 api=ok dish=obstruction=0.02
 
 **Not** on interactive path. Treat as P6 REF or separate content-addressed annex (ASCENT-A style). Starlink can carry large downloads when Priority bandwidth allows; ASCENT only carries the **hash + metadata**, not the multi-GB blob in-band.
 
+### 3.7 SkyPulse PATHHINT (Starlink IP)
+
+Emit a PATHHINT unit on the turn ADU (before or after the greppable header). Receivers that do not implement `0xC5` must skip-by-length once they ship the reserved P2 skip rule; 2.1.0 codecs decode it natively.
+
+```
+0xC5 schema=0x01 len body
+  path_id, next_capacity_bps, freeze_ms, confidence, ttl_ms,
+  optional obstruction, optional elev_deg, optional CRC
+```
+
+On fail: skip (do not apply). Optional P9 wrap only for spool. See `docs/SKYPULSE.md`.
+
+
+**Not** on interactive path. Treat as P6 REF or separate content-addressed annex (ASCENT-A style). Starlink can carry large downloads when Priority bandwidth allows; ASCENT only carries the **hash + metadata**, not the multi-GB blob in-band.
+
 ---
 
 ## 4. Terminal client design + Python skeleton
@@ -231,19 +271,21 @@ DEF-lite: profile=E mode=cloud last_good_turn=41 api=ok dish=obstruction=0.02
 ### 4.2 Sacred-meter diagnostics (operator UX)
 
 ```
-[ASCENT] mode=CLOUD  p0=1.00  api=ok  rtt=48ms  dish=ONLINE  queue=0  erased=0
+[ASCENT] mode=CLOUD  p0=1.00  api=ok  rtt=48ms  dish=ONLINE  queue=0  pathhint cap_hint=50.0Mbps freeze=15000ms conf=0.80
 [ASCENT] mode=EDGE   p0=1.00  api=DOWN dish=ONLINE  queue=3  model=llama3.1:8b
-[ASCENT] mode=QUEUE  p0=1.00  api=flap dish=OBSTRUCTED queue=12 last_erase=2
+[ASCENT] mode=QUEUE  p0=1.00  api=ok   dish=OBSTRUCTED queue=12 pathhint obst=0.40
 ```
+
+`cap_hint` is application goodput seed, not a Starlink RF reading.
 
 ### 4.3 Skeleton layout
 
 See `examples/ascent_starlink_client/` in this repo:
 
-- `daemon.py` - mode machine + queue flush
-- `codec_session.py` - build/parse turn ADUs
+- `daemon.py` - mode machine + queue flush + SkyPulse PATHHINT meter
+- `codec_session.py` - build/parse turn ADUs (PATHHINT prefix)
 - `brains.py` - cloud vs edge adapters
-- `dish_health.py` - optional status stub
+- `dish_health.py` - optional status stub + lab obstruction env
 - `README.md` - run notes
 
 ### 4.4 Local vs remote inference trade-offs
@@ -298,7 +340,7 @@ ASCENT-D is **integrity + fail-closed**, not a substitute for TLS/BPSec.
 | R4 | LEO reconfig jitter (~15s class) | Med | Queue, resume, ASCENT-D optional |
 | R5 | ToS / RE dish firmware | High | Read-only diagnostics only |
 | R6 | Export crypto / unauthorized RF | High | App-layer only; counsel if shipping PQ suite |
-| R7 | Double FEC tax (D + LTP + TM) | Med | D alone on Starlink; full stack deep-space only |
+| R7 | Double FEC tax (D + LTP + TM) | Med | D alone off Starlink IP; E-LEO light CRC; full stack deep-space only |
 | R8 | DTN scope creep for LEO IP | High | Phase 1 = pure IP |
 | R9 | Local model mistaken for Grok liability | High | Banner "EDGE MODE" |
 | R10 | Enterprise-only APIs assumed residential | Med | Feature-detect |
@@ -357,7 +399,9 @@ ASCENT-D is **integrity + fail-closed**, not a substitute for TLS/BPSec.
 - [x] Starlink as failover WAN for `api.x.ai`  
 - [x] Local edge LLM when API unreachable  
 - [x] App-level queue across link flaps  
-- [x] Dish health polling (unofficial, diagnostic)
+- [x] SkyPulse PATHHINT encode/decode + fail-closed skip  
+- [x] ASCENT-E-LEO vs D integrity helper (no double-FEC on Starlink IP)  
+- [x] QUEUE on obstruction / RTT flap in the Phase 1 client
 
 ### Requires partnership or new public capability
 
@@ -411,8 +455,10 @@ Critique loop applied: every "space Grok forever" claim was reduced to dual-mode
 ## Appendix B - Related paths
 
 - Spec: `SPEC.md`  
+- SkyPulse: `docs/SKYPULSE.md`  
+- OrbitStack / LeoAware: `docs/ORBITSTACK-LEOAWARE-BRIDGE.md`  
 - Agent loop: `docs/AGENT-LOOP.md`  
-- Codec: `ref/ascent_codec.py`, `ref/ascent_d.py`  
+- Codec: `ref/ascent_codec.py`, `ref/ascent_d.py`, `ref/ascent_skypulse.py`  
 - Client skeleton: `examples/ascent_starlink_client/`  
 - Skill: `~/.grok/skills/ascent-starlink-resilience/`  
 - DTN stacking skill: `~/.grok/skills/ascent-dtn-space-stacking/`  

@@ -23,6 +23,23 @@ except Exception:
     except Exception:
         encode_text = None  # type: ignore
 
+try:
+    from ascent_skypulse import (  # type: ignore
+        encode_pathhint,
+        recommend_integrity,
+        wrap_pathhint_p9,
+    )
+except Exception:
+    try:
+        from ascent_codec import encode_pathhint  # type: ignore
+
+        recommend_integrity = None  # type: ignore
+        wrap_pathhint_p9 = None  # type: ignore
+    except Exception:
+        encode_pathhint = None  # type: ignore
+        recommend_integrity = None  # type: ignore
+        wrap_pathhint_p9 = None  # type: ignore
+
 ROLE_GUIDE = bytes.fromhex("9AC10100020000060567756964659B")
 
 
@@ -34,6 +51,7 @@ class TurnADU:
     user_text: str
     assistant_text: str = ""
     rtt_ms: Optional[float] = None
+    pathhint: Optional[bytes] = None
 
     def header_ascii(self) -> str:
         rtt = f" rtt_ms={self.rtt_ms:.0f}" if self.rtt_ms is not None else ""
@@ -44,8 +62,10 @@ class TurnADU:
         )
 
     def to_bytes(self) -> bytes:
-        """Header + optional codec body + ROLE fence + assistant prose."""
+        """Header + optional PATHHINT + codec body + ROLE fence + assistant prose."""
         parts: list[bytes] = [self.header_ascii().encode("ascii")]
+        if self.pathhint:
+            parts.append(self.pathhint)
 
         if encode_text is not None:
             try:
@@ -72,8 +92,44 @@ class TurnADU:
         return b"".join(parts)
 
 
+def build_pathhint(
+    *,
+    path_id: int = 1,
+    next_capacity_bps: int = 50_000_000,
+    freeze_ms: int = 15_000,
+    confidence: float = 0.5,
+    ttl_ms: int = 30_000,
+    obstruction: Optional[float] = None,
+    elev_deg: Optional[float] = None,
+    profile: str = "ASCENT-E-LEO",
+) -> Optional[bytes]:
+    """Encode SkyPulse PATHHINT. LEO-IP default: light CRC, no P9."""
+    if encode_pathhint is None:
+        return None
+    pol = recommend_integrity(profile) if recommend_integrity else {"use_pathhint_crc": True, "wrap_p9": False}
+    unit = encode_pathhint(
+        path_id=path_id,
+        next_capacity_bps=next_capacity_bps,
+        freeze_ms=freeze_ms,
+        confidence=confidence,
+        ttl_ms=ttl_ms,
+        obstruction=obstruction,
+        elev_deg=elev_deg,
+        crc=bool(pol.get("use_pathhint_crc")),
+    )
+    if pol.get("wrap_p9") and wrap_pathhint_p9 is not None:
+        wrapped = wrap_pathhint_p9(unit)
+        if wrapped is not None:
+            return wrapped
+    return unit
+
+
 def try_ascent_d_wrap(unit: bytes, max_unit: int = 8192) -> Optional[bytes]:
-    """Optional P9 wrap if ascent_d available and unit fits."""
+    """Optional P9 wrap if ascent_d available and unit fits.
+
+    Starlink IP / ASCENT-E-LEO should not call this on interactive turns
+    (double-FEC tax). Keep for spool/deep-space.
+    """
     if len(unit) > max_unit:
         # Chunk note: Phase 1 keeps whole turn under MAX_UNIT or skips wrap
         return None

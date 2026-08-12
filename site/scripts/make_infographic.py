@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
 W, H = 1200, 1800
-VERSION = "2.0.3"
+VERSION = "2.1.0"
 
 
 def font(size: int, bold: bool = False):

@@ -2,7 +2,7 @@
 
 **Goal:** Freeze implementer-critical wire forms so multi-language codecs stay bit-identical.  
 **SPEC status today:** `1.0.0-rc1`  
-**Architecture / Nexus site:** `2.0.0`  
+**Architecture / Nexus site:** `2.1.0` (SkyPulse additive; Cont freeze unchanged)  
 **Packing:** Cont `0xA0-0xBF` (5-bit) frozen  
 **RC date:** 2026-07-31  
 
@@ -103,3 +103,4 @@ py -3 -c "exec(open('tests/gen_freeze_vectors.py',encoding='utf-8').read())"
 - LDPC alternate ECC  
 - Private plane registries  
 - CHUNK reassembly multi-stream stress tests beyond SPEC prose  
+- SkyPulse PATHHINT (`0xC5`) is **additive** after RC (appendix); does not thaw Cont or P9 goldens  

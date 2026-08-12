@@ -614,7 +614,7 @@ section h2 {
 .event-card.kind-multimodal { border-left-color: var(--p6); }
 .event-card.kind-crypto { border-left-color: var(--p7); }
 .event-card.kind-def { border-left-color: var(--p2); }
-.event-card.kind-pad { border-left-color: var(--faint); }
+.event-card.kind-pathhint { border-left-color: var(--cyan); }
 .ev-label {
   font-family: var(--mono);
   font-size: 0.7rem;

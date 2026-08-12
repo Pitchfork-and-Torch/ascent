@@ -143,10 +143,19 @@ def test_events_kind_strings_only():
             "def",
             "crypto",
             "pad",
+            "pathhint",
         )
     j = events_to_jsonable(events)
     for row in j:
-        assert row["kind"] in ("text", "agent", "multimodal", "def", "crypto", "pad")
+        assert row["kind"] in (
+            "text",
+            "agent",
+            "multimodal",
+            "def",
+            "crypto",
+            "pad",
+            "pathhint",
+        )
         # mm wire kind must not overwrite event kind
         if row["kind"] == "multimodal":
             assert row.get("mm_kind") == 1

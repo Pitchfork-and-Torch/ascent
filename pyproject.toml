@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ascent-wire"
-version = "2.0.2"
-description = "ASCENT wire codec: ASCII-successor stream with agents, multimodal, deep-space ECC"
+version = "2.1.0"
+description = "ASCENT wire codec: ASCII-successor stream with agents, multimodal, SkyPulse PATHHINT, deep-space ECC"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

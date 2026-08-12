@@ -7,7 +7,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-__version__ = "2.0.2"
+__version__ = "2.1.0"
 
 
 def _vendor_dir() -> Path:
@@ -33,9 +33,12 @@ from ascent_codec import (  # noqa: E402,F401
     AscentCodecError,
     Cont,
     HELLO_UNIVERSE_HEX,
+    canonical_pathhint_bytes,
     cont_byte,
     cont_val,
+    decode_skystate,
     decode_stream,
+    encode_pathhint,
     encode_scalar,
     encode_text,
     encode_text_ascent7,
@@ -56,6 +59,21 @@ except Exception:  # reedsolo optional for minimal installs
     strip_to_earth = None  # type: ignore
     AscentDError = Exception  # type: ignore
 
+try:
+    from ascent_skypulse import (  # noqa: E402,F401
+        PathHint,
+        format_pathhint_meter,
+        recommend_integrity,
+        should_queue_session,
+        wrap_pathhint_p9,
+    )
+except Exception:  # pragma: no cover
+    PathHint = None  # type: ignore
+    recommend_integrity = None  # type: ignore
+    should_queue_session = None  # type: ignore
+    wrap_pathhint_p9 = None  # type: ignore
+    format_pathhint_meter = None  # type: ignore
+
 __all__ = [
     "__version__",
     "AscentCodecError",
@@ -69,6 +87,14 @@ __all__ = [
     "encode_text_ascent7",
     "events_to_jsonable",
     "hello_universe_bytes",
+    "encode_pathhint",
+    "decode_skystate",
+    "canonical_pathhint_bytes",
+    "PathHint",
+    "recommend_integrity",
+    "should_queue_session",
+    "wrap_pathhint_p9",
+    "format_pathhint_meter",
     "encode_p9",
     "decode_p9",
     "strip_to_earth",

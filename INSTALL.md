@@ -1,6 +1,6 @@
 # Install ASCENT
 
-**SPEC:** 1.0.0-rc1 · **Nexus / packages:** 2.0.2 · MIT
+**SPEC:** 1.0.0-rc1 · **Nexus / packages:** 2.1.0 · MIT
 
 ## Python (`ascent-wire`)
 
@@ -25,10 +25,10 @@ pip install "ascent-wire[deep-space]"
 
 ```bash
 # Release asset
-pip install ascent_wire-2.0.2-py3-none-any.whl
+pip install ascent_wire-2.1.0-py3-none-any.whl
 
 # From git tag
-pip install "git+https://github.com/Pitchfork-and-Torch/ascent.git@v2.0.2"
+pip install "git+https://github.com/Pitchfork-and-Torch/ascent.git@v2.1.0"
 ```
 
 ### Editable clone
@@ -80,8 +80,8 @@ node tests/run_js_lock.js
 
 | Registry | Status |
 |----------|--------|
-| **PyPI** `ascent-wire` | **Published** 2.0.2 (Python) |
-| **npm** `ascent-wire` | **Published** 2.0.2 (JavaScript) |
+| **PyPI** `ascent-wire` | **In-repo 2.1.0** (publish on Jon release) |
+| **npm** `ascent-wire` | **In-repo 2.1.0** (publish on Jon release) |
 | GitHub Releases | Wheel + sdist also attached |
 | Trusted Publishing | `.github/workflows/publish-pypi.yml` (OIDC on release) |
 

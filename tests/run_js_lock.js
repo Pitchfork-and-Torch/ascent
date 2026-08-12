@@ -154,6 +154,38 @@ function main() {
     "freeze hello universe"
   );
 
+  // SkyPulse PATHHINT goldens
+  var sky = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "tests", "skypulse_vectors.json"), "utf8")
+  );
+  var plainHint = C.canonicalPathhintBytes(false);
+  ok(
+    C.hexOf(plainHint).toLowerCase() === sky.plain.hex.toLowerCase(),
+    "SkyPulse plain PATHHINT hex"
+  );
+  var pev = C.decodeStream(plainHint);
+  ok(pev.length === 1 && pev[0].kind === "pathhint" && pev[0].applied === true, "plain applied");
+  ok(pev[0].pathId === 66 && pev[0].nextCapacityBps === 50000000, "plain fields");
+  ok(Math.abs(pev[0].confidence - 0.8) < 1e-9, "plain confidence");
+  ok(Math.abs(pev[0].obstruction - 0.2) < 1e-9, "plain obstruction");
+  ok(Math.abs(pev[0].elevDeg - 42.0) < 1e-9, "plain elev");
+  var crcHint = C.canonicalPathhintBytes(true);
+  ok(
+    C.hexOf(crcHint).toLowerCase() === sky.crc.hex.toLowerCase(),
+    "SkyPulse CRC PATHHINT hex"
+  );
+  ok(C.decodeStream(crcHint)[0].applied === true && C.decodeStream(crcHint)[0].crc === true, "crc applied");
+  var skipU8 = C.fromHex(sky.unknown_schema.hex);
+  var sev = C.decodeStream(skipU8)[0];
+  ok(sev.applied === false && sev.reason === "unknown_schema", "fail-closed unknown schema");
+  var flipped = new Uint8Array(crcHint);
+  flipped[flipped.length - 1] ^= 0xff;
+  ok(C.decodeStream(flipped)[0].reason === "crc_fail", "fail-closed crc");
+  var leo = C.recommendIntegrity("ASCENT-E-LEO");
+  var dee = C.recommendIntegrity("ASCENT-D");
+  ok(leo.wrapP9 === false && leo.mode === "crc", "LEO-IP no P9 RS");
+  ok(dee.wrapP9 === true && dee.mode === "p9", "D uses P9");
+
   // P9 lock against Python freeze
   var unit = C.fromHex(freeze.p9_hello_unit_hex);
   var frame = D.encodeP9(unit, { profile: D.PROFILE_D });

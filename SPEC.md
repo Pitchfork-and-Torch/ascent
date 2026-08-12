@@ -2,7 +2,7 @@
 
 **Status:** Release Candidate for implementer freeze  
 **Version:** 1.0.0-rc1  
-**Nexus / architecture card:** 2.0.0  
+**Nexus / architecture card:** 2.1.0 (SkyPulse)  
 **Freeze companions:** `docs/SPEC-FREEZE-1.0-RC.md`, `tests/freeze_vectors.json`, `node tests/run_js_lock.js`  
 **Parse law (eternal):** if a byte is less than `0x80`, it is classic 7-bit ASCII, bit-identical, forever.
 
@@ -27,6 +27,7 @@ ASCENT is not "Unicode but better." It is a wire contract: identity for greppers
 |-------|------|
 | `ASCENT-7` | Identity only: pure classic ASCII |
 | `ASCENT-E` | Earth / general interchange |
+| `ASCENT-E-LEO` | Usage profile of E: SkyPulse PATHHINT, light integrity on LEO IP (not a parse-law fork) |
 | `ASCENT-D` | Deep-space (strong outer ECC, long sync) |
 | `ASCENT-A` | Archive / self-description heavy |
 
@@ -117,7 +118,9 @@ else:
 | `0xC1` | AGENT_OP | `ver:u8` `opcode:u16be` `flags:u8` `len:u16be` `args` |
 | `0xC2` | VERSION_BUMP | `len:u16be` `body` |
 | `0xC3` | REGISTRY_DELTA | `len:u32be` `body` |
-| `0xC4-0xCE` | Reserved | Skip-by-length when header present |
+| `0xC4` | Reserved | Skip-by-length when header present |
+| `0xC5` | SKYSTATE | `schema:u8` `len:u16be` `body` (PATHHINT schema `0x01`; see appendix SkyPulse) |
+| `0xC6-0xCE` | Reserved | Skip-by-length when header present |
 | `0xCF` | PRIVATE_OP | `plane:u16be` `len:u32be` `body` (P10+) |
 
 **Private planes (P10+):** hash-named default (`plane_id` from hash of `org||name`, salt on collision); interchange embeds a DEF slice. Optional public block `0x8000-0x8FFF` via maintainers. MUST declare `fixed|vwidth`, `max_unit`, `skip`. MUST NOT remap `0x00-0x7F` or P1/P2 leads.
@@ -399,6 +402,7 @@ DEF may lower caps, not raise past hard. Over hard: always reject.
 |---------|------|--------|
 | **ASCENT-7** | Identity-only | Pure P0; any classic ASCII file is valid |
 | **ASCENT-E** | Earth / general | Full control + scripts + agents + MM + crypto; light ECC optional |
+| **ASCENT-E-LEO** | LEO IP usage of E | PATHHINT on Starlink-class IP; prefer light CRC / no P9 RS on interactive turns |
 | **ASCENT-D** | Deep-space | Strong outer ECC, long sync, low-entropy defaults; MM ref-only preferred; PQ freeze common |
 | **ASCENT-A** | Archive | Max DEF + hash chain; full normative embed encouraged; annex repair optional |
 
@@ -635,6 +639,48 @@ Normative wire forms used by multi-language goldens are summarized in:
 
 Agent loop adoption guide: `docs/AGENT-LOOP.md`.  
 Installable Python package: `ascent-wire` (`pyproject.toml`, `python -m ascent self-test`).
+
+---
+
+## Appendix: SkyPulse / PATHHINT (append-only, 2.1.0)
+
+This appendix does **not** change P0-P2 parse law, Cont freeze (`0xA0-0xBF`, 5-bit), or ASCENT-D P9 defaults. It assigns reserved P2 lead `0xC5` and documents usage profile **ASCENT-E-LEO**.
+
+**Non-claims:** ASCENT does not increase Starlink physical RF Mbps. PATHHINT is an application goodput / CCA foresight unit. Fail-closed skip is the same spirit as D erase-on-fail.
+
+### G.1 SKYSTATE lead
+
+```
+0xC5 <schema:u8> <len:u16be> <body:len>
+```
+
+- `len` cap for skip: 16384 (P2 soft). Schema `0x01` body cap: 256.  
+- Unknown `schema` with readable `len`: **skip-by-length**; do not apply.  
+- Truncation before `len` is readable: hard-fault.
+
+### G.2 PATHHINT v1 (`schema = 0x01`)
+
+Body 26 bytes, plus 4 if `FLAG_CRC`:
+
+| Offset | Field | Notes |
+|--------|-------|-------|
+| 0 | `flags:u8` | bit0 CAP_KBPS; bit1 HAS_OBSTRUCTION; bit2 HAS_ELEV; bit3 RELATIVE_FREEZE (v1 MUST set); bit4 CRC; bit5-7 MBZ |
+| 1 | `path_id:u64be` | path or epoch |
+| 9 | `next_capacity:u32be` | bps, or kbps if CAP_KBPS |
+| 13 | `freeze_ms:u32be` | relative growth-freeze |
+| 17 | `confidence:u16be` | 0..10000 => [0,1] |
+| 19 | `ttl_ms:u32be` | hint lifetime |
+| 23 | `obstruction:u8` | 0..255 => [0,1] if HAS_OBSTRUCTION; else `0xFF` |
+| 24 | `elev_deg_x10:i16be` | degrees * 10; `0x7FFF` absent |
+| 26 | `crc32:u32be` | optional IEEE CRC-32 of bytes 0..25 |
+
+Reserved flag bits, bad length, CRC fail, or confidence > 10000: **skip (do not apply)**. Optional P9 wrap of the whole unit when integrity is requested (spool / D). Interactive LEO IP SHOULD NOT require P9 RS (double-FEC tax vs PHY+TLS).
+
+### G.3 ASCENT-E-LEO vs ASCENT-D
+
+ASCENT-E-LEO is a **usage profile** of E: emit/consume PATHHINT; prefer light CRC or none; keep D for spool/deep-space. It is not a new parse law and does not freeze Cont differently.
+
+Goldens: `tests/skypulse_vectors.json`. Narrative: `docs/SKYPULSE.md`. LeoAware bridge: `docs/ORBITSTACK-LEOAWARE-BRIDGE.md`.
 
 ---
 

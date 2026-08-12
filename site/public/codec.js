@@ -21,6 +21,21 @@
   var HEADER_MAGIC = "ASCENT/1.0\n";
   var PLANE_P3 = 0x03;
 
+  var LEAD_SKYSTATE = 0xc5;
+  var PATHHINT_SCHEMA_V1 = 0x01;
+  var PATHHINT_BODY_LEN = 26;
+  var PATHHINT_BODY_LEN_CRC = 30;
+  var PATHHINT_MAX_BODY = 256;
+  var P2_SKIP_CAP = 16384;
+  var FLAG_CAP_KBPS = 0x01;
+  var FLAG_HAS_OBSTRUCTION = 0x02;
+  var FLAG_HAS_ELEV = 0x04;
+  var FLAG_RELATIVE_FREEZE = 0x08;
+  var FLAG_CRC = 0x10;
+  var FLAG_RESERVED_MASK = 0xe0;
+  var ELEV_ABSENT = 0x7fff;
+  var OBSTRUCTION_ABSENT = 0xff;
+
   // SPEC.md E.2 interop hex
   var HELLO_UNIVERSE_HEX =
     "415343454E542F312E300A48656C6C6F" +
@@ -138,6 +153,43 @@
 
   function pushU16(out, n) {
     out.push((n >> 8) & 0xff, n & 0xff);
+  }
+
+  function pushU32(out, n) {
+    n = n >>> 0;
+    out.push((n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff);
+  }
+
+  function pushI16(out, n) {
+    if (n < 0) n = (0x10000 + n) & 0xffff;
+    out.push((n >> 8) & 0xff, n & 0xff);
+  }
+
+  function i16be(u8, i) {
+    if (i + 2 > u8.length) throw new AscentError("truncated i16");
+    var v = (u8[i] << 8) | u8[i + 1];
+    if (v & 0x8000) v = v - 0x10000;
+    return [v, i + 2];
+  }
+
+  var CRC32_TABLE = (function () {
+    var t = new Uint32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) {
+        c = c & 1 ? (0xedb88320 ^ (c >>> 1)) : c >>> 1;
+      }
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32Ieee(u8) {
+    var c = 0xffffffff;
+    for (var i = 0; i < u8.length; i++) {
+      c = CRC32_TABLE[(c ^ u8[i]) & 0xff] ^ (c >>> 8);
+    }
+    return (c ^ 0xffffffff) >>> 0;
   }
 
   function pushU64(out, n) {
@@ -559,7 +611,7 @@
         else if (b === 0x9d || b === 0x4d) planeHits.P6++;
         else if (b === 0x9c || b === 0x4b) planeHits.P7++;
         else if (b === 0xc0) planeHits.P8++;
-        else if (b === 0xc1) planeHits.P2++;
+        else if (b === 0xc1 || b === 0xc5) planeHits.P2++;
         else if (b >= 0x80 && b <= 0x9f) planeHits.P1++;
         else if (b >= 0xa0 && b <= 0xbf) planeHits.P3++;
         else if (b >= 0xd0 && b <= 0xf5) planeHits.P3++;
@@ -893,11 +945,286 @@
     ];
   }
 
+  function pathhintSkipEvent(start, end, schema, reason, flags, bodyLen) {
+    return {
+      kind: "pathhint",
+      schema: schema,
+      applied: false,
+      skipped: true,
+      reason: reason,
+      flags: flags || 0,
+      len: bodyLen || 0,
+      offset: start,
+      end: end,
+    };
+  }
+
+  function parsePathhintV1Body(body, start, end, schema) {
+    if (!body.length) {
+      return pathhintSkipEvent(start, end, schema, "truncated_body", 0, 0);
+    }
+    var flags = body[0];
+    if (flags & FLAG_RESERVED_MASK) {
+      return pathhintSkipEvent(
+        start,
+        end,
+        schema,
+        "unknown_flags",
+        flags,
+        body.length
+      );
+    }
+    var want = flags & FLAG_CRC ? PATHHINT_BODY_LEN_CRC : PATHHINT_BODY_LEN;
+    if (body.length !== want) {
+      return pathhintSkipEvent(
+        start,
+        end,
+        schema,
+        "bad_body_len",
+        flags,
+        body.length
+      );
+    }
+    if (flags & FLAG_CRC) {
+      var got =
+        ((body[PATHHINT_BODY_LEN] << 24) |
+          (body[PATHHINT_BODY_LEN + 1] << 16) |
+          (body[PATHHINT_BODY_LEN + 2] << 8) |
+          body[PATHHINT_BODY_LEN + 3]) >>>
+        0;
+      var expect = crc32Ieee(body.slice(0, PATHHINT_BODY_LEN));
+      if (got !== expect) {
+        return pathhintSkipEvent(start, end, schema, "crc_fail", flags, body.length);
+      }
+    }
+    var pathPair = u64be(body, 1);
+    var pathId = pathPair[0];
+    var capPair = u32be(body, 9);
+    var capRaw = capPair[0];
+    var freezePair = u32be(body, 13);
+    var freezeMs = freezePair[0];
+    var confPair = u16be(body, 17);
+    var confU16 = confPair[0];
+    var ttlPair = u32be(body, 19);
+    var ttlMs = ttlPair[0];
+    var obstU8 = body[23];
+    var elevPair = i16be(body, 24);
+    var elevI16 = elevPair[0];
+    if (confU16 > 10000) {
+      return pathhintSkipEvent(
+        start,
+        end,
+        schema,
+        "confidence_range",
+        flags,
+        body.length
+      );
+    }
+    var nextBps = flags & FLAG_CAP_KBPS ? capRaw * 1000 : capRaw;
+    var nextKbps = flags & FLAG_CAP_KBPS ? capRaw : capRaw ? Math.floor((capRaw + 999) / 1000) : 0;
+    var obst = flags & FLAG_HAS_OBSTRUCTION ? obstU8 / 255.0 : null;
+    var elev =
+      flags & FLAG_HAS_ELEV && elevI16 !== ELEV_ABSENT ? elevI16 / 10.0 : null;
+    return {
+      kind: "pathhint",
+      schema: schema,
+      applied: true,
+      skipped: false,
+      reason: "",
+      flags: flags,
+      pathId: pathId,
+      path_id: pathId,
+      nextCapacityBps: nextBps,
+      next_capacity_bps: nextBps,
+      nextCapacityKbps: nextKbps,
+      next_capacity_kbps: nextKbps,
+      freezeMs: freezeMs,
+      freeze_ms: freezeMs,
+      freezeUntilMs: freezeMs,
+      freeze_until_ms: freezeMs,
+      confidence: confU16 / 10000.0,
+      ttlMs: ttlMs,
+      ttl_ms: ttlMs,
+      obstruction: obst,
+      elevDeg: elev,
+      elev_deg: elev,
+      crc: !!(flags & FLAG_CRC),
+      len: body.length,
+      offset: start,
+      end: end,
+    };
+  }
+
+  function decodeSkystate(body, start) {
+    var i = start + 1;
+    if (i >= body.length) throw new AscentError("truncated SKYSTATE schema");
+    var schema = body[i++];
+    var lenPair = u16be(body, i);
+    var blen = lenPair[0];
+    i = lenPair[1];
+    if (blen > P2_SKIP_CAP) throw new AscentError("SKYSTATE body over skip cap");
+    if (i + blen > body.length) throw new AscentError("truncated SKYSTATE body");
+    var payload = body.slice(i, i + blen);
+    i += blen;
+    if (schema !== PATHHINT_SCHEMA_V1) {
+      return [pathhintSkipEvent(start, i, schema, "unknown_schema", 0, blen), i];
+    }
+    if (blen > PATHHINT_MAX_BODY) {
+      return [pathhintSkipEvent(start, i, schema, "over_schema_cap", 0, blen), i];
+    }
+    return [parsePathhintV1Body(payload, start, i, schema), i];
+  }
+
+  function encodePathhint(opts) {
+    opts = opts || {};
+    var pathId = opts.pathId != null ? opts.pathId : opts.path_id != null ? opts.path_id : 0;
+    var confidence =
+      opts.confidence != null ? Number(opts.confidence) : 0;
+    if (confidence < 0 || confidence > 1) {
+      throw new AscentError("confidence must be in [0, 1]");
+    }
+    var freezeMs =
+      opts.freezeMs != null
+        ? opts.freezeMs
+        : opts.freeze_ms != null
+          ? opts.freeze_ms
+          : opts.freezeUntilMs != null
+            ? opts.freezeUntilMs
+            : opts.freeze_until_ms != null
+              ? opts.freeze_until_ms
+              : 0;
+    var ttlMs = opts.ttlMs != null ? opts.ttlMs : opts.ttl_ms != null ? opts.ttl_ms : 0;
+    if (freezeMs < 0 || ttlMs < 0) {
+      throw new AscentError("freeze_ms and ttl_ms must be >= 0");
+    }
+    var flags = FLAG_RELATIVE_FREEZE;
+    var capRaw = 0;
+    var bps = opts.nextCapacityBps != null ? opts.nextCapacityBps : opts.next_capacity_bps;
+    var kbps = opts.nextCapacityKbps != null ? opts.nextCapacityKbps : opts.next_capacity_kbps;
+    if (kbps != null && bps != null) {
+      throw new AscentError("pass next_capacity_bps or next_capacity_kbps, not both");
+    }
+    if (kbps != null) {
+      flags |= FLAG_CAP_KBPS;
+      capRaw = kbps >>> 0;
+    } else if (bps == null) {
+      capRaw = 0;
+    } else if (bps > 0xffffffff) {
+      flags |= FLAG_CAP_KBPS;
+      capRaw = Math.floor((bps + 999) / 1000) >>> 0;
+    } else {
+      capRaw = bps >>> 0;
+    }
+    var obst = opts.obstruction;
+    var obstU8 = OBSTRUCTION_ABSENT;
+    if (obst != null && obst !== "") {
+      obst = Number(obst);
+      if (obst < 0 || obst > 1) throw new AscentError("obstruction must be in [0, 1]");
+      flags |= FLAG_HAS_OBSTRUCTION;
+      obstU8 = Math.round(obst * 255);
+      if (obstU8 > 255) obstU8 = 255;
+    }
+    var elev = opts.elevDeg != null ? opts.elevDeg : opts.elev_deg;
+    var elevI16 = ELEV_ABSENT;
+    if (elev != null && elev !== "") {
+      elev = Number(elev);
+      if (elev < -90 || elev > 90) throw new AscentError("elev_deg must be in [-90, 90]");
+      flags |= FLAG_HAS_ELEV;
+      elevI16 = Math.round(elev * 10);
+    }
+    var wantCrc = !!(opts.crc || opts.useCrc);
+    if (wantCrc) flags |= FLAG_CRC;
+    var confU16 = Math.round(confidence * 10000);
+    var body = [];
+    body.push(flags & 0xff);
+    pushU64(body, pathId);
+    pushU32(body, capRaw);
+    pushU32(body, freezeMs >>> 0);
+    pushU16(body, confU16);
+    pushU32(body, ttlMs >>> 0);
+    body.push(obstU8);
+    pushI16(body, elevI16);
+    if (body.length !== PATHHINT_BODY_LEN) {
+      throw new AscentError("PATHHINT v1 body length bug");
+    }
+    if (wantCrc) {
+      var crc = crc32Ieee(new Uint8Array(body));
+      pushU32(body, crc);
+    }
+    var out = [LEAD_SKYSTATE, PATHHINT_SCHEMA_V1];
+    pushU16(out, body.length);
+    return new Uint8Array(out.concat(body));
+  }
+
+  function canonicalPathhintBytes(crc) {
+    return encodePathhint({
+      pathId: 0x42,
+      nextCapacityBps: 50000000,
+      freezeMs: 15000,
+      confidence: 0.8,
+      ttlMs: 30000,
+      obstruction: 0.2,
+      elevDeg: 42.0,
+      crc: !!crc,
+    });
+  }
+
+  function recommendIntegrity(profile) {
+    var p = String(profile || "")
+      .trim()
+      .toUpperCase()
+      .replace(/_/g, "-");
+    if (
+      p === "ASCENT-D" ||
+      p === "D" ||
+      p === "DEEP" ||
+      p === "DEEP-SPACE" ||
+      p === "SPOOL"
+    ) {
+      return {
+        profile: "ASCENT-D",
+        mode: "p9",
+        doubleFec: false,
+        usePathhintCrc: false,
+        wrapP9: true,
+        note:
+          "ASCENT-D: outer RS(255,223) erase-on-fail. Skip extra PATHHINT CRC. Spool/deep-space, not interactive Starlink IP.",
+      };
+    }
+    if (
+      p === "ASCENT-E-LEO" ||
+      p === "E-LEO" ||
+      p === "LEO" ||
+      p === "LEO-IP" ||
+      p === "STARLINK" ||
+      p === "SKY" ||
+      p === "SKYPULSE"
+    ) {
+      return {
+        profile: "ASCENT-E-LEO",
+        mode: "crc",
+        doubleFec: false,
+        usePathhintCrc: true,
+        wrapP9: false,
+        note:
+          "ASCENT-E-LEO: Starlink/LEO IP already has PHY+TLS. Prefer light PATHHINT CRC or none. Do not wrap interactive turns in P9 RS. PATHHINT is a goodput hint, not an RF Mbps upgrade.",
+      };
+    }
+    return {
+      profile: "ASCENT-E",
+      mode: "none",
+      doubleFec: false,
+      usePathhintCrc: false,
+      wrapP9: false,
+      note: "ASCENT-E default: plain PATHHINT unit; optional CRC. P9 only if integrity requested.",
+    };
+  }
+
   /**
    * Full decode to list of event objects.
    * P0 + ASCENT-V scalars merge into continuous text events
    * (kind="text", text=..., ascii=..., offset, end).
-   * agent / multimodal (mmKind) / def / crypto / pad as separate events.
+   * agent / multimodal (mmKind) / def / crypto / pathhint / pad as separate events.
    * Never overwrite event kind with numeric wire fields.
    */
   function decodeStream(data) {
@@ -979,6 +1306,12 @@
         var defPair = decodeDef(data, i);
         events.push(defPair[0]);
         i = defPair[1];
+        continue;
+      }
+      if (b === LEAD_SKYSTATE) {
+        var skyPair = decodeSkystate(data, i);
+        events.push(skyPair[0]);
+        i = skyPair[1];
         continue;
       }
       if (b === 0x9f) {
@@ -1085,6 +1418,13 @@
     encodeMmInlineUtf8: encodeMmInlineUtf8,
     encodeMmRef: encodeMmRef,
     encodeCrypto: encodeCrypto,
+    encodePathhint: encodePathhint,
+    decodeSkystate: decodeSkystate,
+    canonicalPathhintBytes: canonicalPathhintBytes,
+    recommendIntegrity: recommendIntegrity,
+    crc32Ieee: crc32Ieee,
+    LEAD_SKYSTATE: LEAD_SKYSTATE,
+    PATHHINT_SCHEMA_V1: PATHHINT_SCHEMA_V1,
     decodeStream: decodeStream,
     analyzeStream: analyzeStream,
     concatBytes: concatBytes,
@@ -1103,7 +1443,7 @@
     HELLO_UNIVERSE_HEX: HELLO_UNIVERSE_HEX,
     HEADER_MAGIC: HEADER_MAGIC,
     AscentError: AscentError,
-    version: "2.0.0-nexus",
+    version: "2.1.0-skypulse",
   };
 
   global.AscentCodec = AscentCodec;
