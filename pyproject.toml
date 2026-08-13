@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ascent-wire"
+version = "2.1.0"
+description = "ASCENT wire codec: ASCII-successor stream with agents, multimodal, SkyPulse PATHHINT, deep-space ECC"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Pitchfork and Torch" }]
+keywords = ["ascent", "ascii", "encoding", "agents", "wire", "ecc"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Libraries",
+]
+dependencies = []
+
+[project.optional-dependencies]
+deep-space = ["reedsolo>=1.7"]
+dev = ["reedsolo>=1.7"]
+
+[project.urls]
+Homepage = "https://ascent.jonbailey.xyz/"
+Repository = "https://github.com/Pitchfork-and-Torch/ascent"
+Documentation = "https://github.com/Pitchfork-and-Torch/ascent/blob/main/SPEC.md"
+
+[project.scripts]
+ascent = "ascent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ascent*"]
+exclude = ["tests*", "site*", "design*", "docs*", "examples*"]
+
+[tool.setuptools.package-data]
+ascent = ["_ref/*.py"]
