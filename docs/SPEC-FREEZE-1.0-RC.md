@@ -36,7 +36,8 @@
 | 4-byte | `F0-F4` | 3 Cont | from U+4280 when residual fits |
 | LONG | `F5 03` | u24be | remaining scalars |
 
-Goldens: `caf\u00e9` -> `636166D3A9`; U+1F680 -> `F3ADA0A0`
+Goldens: `caf\u00e9` -> `636166D3A9`; U+1F680 -> `F3ADA0A0`  
+Encoding guard: LONG `F503000041` reject overlong; first legal LONG U+2C280 -> `F50302C280` (`tests/encoding_guard_vectors.json`)
 
 ### Agent frame
 

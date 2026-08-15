@@ -1,0 +1,29 @@
+{
+  "note": "SPEC C.4.1 encoding guard. LONG F5 03 + u24be MUST reject overlong ASCII and non-minimal width. First legal LONG scalar is U+2C280.",
+  "overlong_ascii_A": {
+    "hex": "F503000041",
+    "reject": "overlong"
+  },
+  "overlong_ascii_NUL": {
+    "hex": "F503000000",
+    "reject": "overlong"
+  },
+  "nonminimal_cafe": {
+    "hex": "F5030000E9",
+    "reject": "non-minimal",
+    "shortest_hex": "D3A9"
+  },
+  "nonminimal_rocket": {
+    "hex": "F50301F680",
+    "reject": "non-minimal",
+    "shortest_hex": "F3ADA0A0"
+  },
+  "legal_long_2c280": {
+    "hex": "F50302C280",
+    "cp": 180864
+  },
+  "last_4byte_2c27f": {
+    "hex": "F4BFBFBF",
+    "cp": 180863
+  }
+}

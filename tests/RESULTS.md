@@ -19,6 +19,7 @@ py -3 ref/ascent_decode.py --self-test
 | test_surrogate_raises | PASS |
 | test_ascent7_rejects_non_ascii | PASS |
 | test_events_kind_strings_only | PASS |
+| test_encoding_guard_long | PASS |
 | test_cont_frozen | PASS |
 | ALL TESTS PASS | PASS |
 | ascent_decode --self-test | PASS (builder 132 == SPEC hex) |
@@ -33,6 +34,7 @@ py -3 ref/ascent_decode.py --self-test
 - latin1_e_acute_v (round-trip)
 - rocket_emoji_v (round-trip)
 - bridge_cafe (MM INLINE)
+- encoding_guard_vectors (LONG overlong ASCII + non-minimal reject; first legal LONG U+2C280)
 
 ## Notes
 

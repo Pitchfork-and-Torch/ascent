@@ -332,7 +332,7 @@ Let `cont(x) = 0xA0 | (x & 0x1F)`.
    - Wire: `lead cont0 cont1` (3 bytes)
 
 3. **4-byte** - `cp >= U+4280` and residual `v` fits in 18 bits with top field `0..4`
-   (equivalently `0 <= v < (5 << 15)`, max `cp = U+2C07F`):
+   (equivalently `0 <= v < (5 << 15)`, max `cp = U+2C27F`):
    - `v = cp - 0x4280`
    - Require `((v >> 15) & 0xF) <= 4` so `lead = 0xF0 | ((v >> 15) & 0xF)` lands in `0xF0-0xF4`
    - `cont0 = cont(v >> 10)`
@@ -348,7 +348,7 @@ Let `cont(x) = 0xA0 | (x & 0x1F)`.
 - if `L` in `0xD0-0xDF`: read 1 cont; `v = ((L & 0xF) << 5) | (c0 & 0x1F)`; `cp = v + 0x80`
 - if `L` in `0xE0-0xEF`: read 2 conts; `v = ((L & 0xF) << 10) | ((c0 & 0x1F) << 5) | (c1 & 0x1F)`; `cp = v + 0x280`
 - if `L` in `0xF0-0xF4`: read 3 conts; `v = ((L & 0xF) << 15) | ((c0 & 0x1F) << 10) | ((c1 & 0x1F) << 5) | (c2 & 0x1F)`; `cp = v + 0x4280`
-- if `L == 0xF5` and next byte `== 0x03`: read `cp:u24be`; accept only non-surrogate scalars `<= 0x10FFFF`
+- if `L == 0xF5` and next byte `== 0x03`: read `cp:u24be`; accept only non-surrogate scalars `<= 0x10FFFF` that cannot use a shorter 2/3/4-byte form (`cp >= U+2C280`). Reject `cp < 0x80` as overlong ASCII.
 - else: plane-select / reserved / hard-fault per profile
 
 **Illegal (MUST reject):**

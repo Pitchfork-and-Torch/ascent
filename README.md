@@ -210,6 +210,7 @@ assets/masters/         Source OG + infographic masters
 | [docs/ascent-starlink-interface.png](docs/ascent-starlink-interface.png) | Horizontal ASCENT x Starlink interface map (2400x1100) |
 | [examples/ascent_starlink_client/](examples/ascent_starlink_client/) | Dual-mode CLI skeleton (cloud / edge / queue) |
 | [docs/AGENT-LOOP.md](docs/AGENT-LOOP.md) | LLM agent loop guide |
+| [docs/ENCODING-GUARD.md](docs/ENCODING-GUARD.md) | LONG overlong / non-minimal reject |
 | [docs/SPEC-FREEZE-1.0-RC.md](docs/SPEC-FREEZE-1.0-RC.md) | 1.0-RC freeze checklist |
 | [ref/ascent_decode.py](ref/ascent_decode.py) | Python decoder |
 | [ref/aegir_sketch.py](ref/aegir_sketch.py) | AEGIR encryption sketch |

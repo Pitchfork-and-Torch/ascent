@@ -12,6 +12,7 @@
 | [RELEASE-2.1.0.md](RELEASE-2.1.0.md) | In-repo release notes draft (no publish) |
 | [AGENT-LOOP.md](AGENT-LOOP.md) | LLM agent loop guide |
 | [SPEC-FREEZE-1.0-RC.md](SPEC-FREEZE-1.0-RC.md) | 1.0-RC freeze checklist |
+| [ENCODING-GUARD.md](ENCODING-GUARD.md) | LONG overlong / non-minimal reject (SPEC C.4.1) |
 
 **Current card:** ASCENT Nexus Wire Lab 2.0 · architecture **v2.1.0** (SkyPulse)
 

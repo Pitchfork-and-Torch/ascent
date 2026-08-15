@@ -55,8 +55,8 @@
       name: "Scripts",
       role: "Living + historical",
       detail:
-        "ASCENT-V variable-width scalars with frozen Cont 0xA0-0xBF (5-bit). No overlongs of 0x00-0x7F. No UTF-16 surrogates on the wire.",
-      example: "vscalar",
+        "ASCENT-V variable-width scalars with frozen Cont 0xA0-0xBF (5-bit). No overlongs of 0x00-0x7F. LONG F5 03 is illegal for ASCII or any scalar that fits a shorter form. No UTF-16 surrogates on the wire.",
+      example: "encguard",
     },
     {
       id: "P4",
@@ -123,6 +123,7 @@
     { id: "agentloop", label: "Agent loop demo", build: buildAgentLoop },
     { id: "mm", label: "Multimodal REF", build: buildMm },
     { id: "vscalar", label: "ASCENT-V cafe", build: buildVScalar },
+    { id: "encguard", label: "Encoding guard", build: buildEncodingGuard },
     { id: "emoji", label: "Emoji scalar", build: buildEmoji },
     { id: "aegir", label: "AEGIR envelope", build: buildAegir },
     { id: "deep", label: "Deep-space packet", build: buildDeep },
@@ -208,8 +209,15 @@
       id: "v",
       label: "ASCENT-V",
       html:
-        "<h3>Frozen ASCENT-V packing (1.1+)</h3><p>Cont class <code>0xA0-0xBF</code> (5 payload bits). Shortest of 2/3/4-byte, else LONG <code>F5 03</code> + u24be.</p><pre>e acute U+00E9 -&gt; D3 A9\nrocket U+1F680 -&gt; F3 AD A0 A0</pre>",
+        "<h3>Frozen ASCENT-V packing (1.1+)</h3><p>Cont class <code>0xA0-0xBF</code> (5 payload bits). Shortest of 2/3/4-byte, else LONG <code>F5 03</code> + u24be. Max 4-byte scalar is U+2C27F.</p><pre>e acute U+00E9 -&gt; D3 A9\nrocket U+1F680 -&gt; F3 AD A0 A0</pre>",
       sample: "vscalar",
+    },
+    {
+      id: "encguard",
+      label: "Encoding guard",
+      html:
+        "<h3>Encoding guard (LONG overlongs)</h3><p>LONG <code>F5 03</code> + u24be MUST reject ASCII overlongs and non-minimal width. Paste <code>F5 03 00 00 41</code> (overlong A). Legal LONG starts at U+2C280 (<code>F5 03 02 C2 80</code>).</p><pre>F5 03 00 00 41  -&gt; reject overlong ASCII\nF5 03 00 00 E9  -&gt; reject (cafe is D3 A9)\nF5 03 02 C2 80  -&gt; U+2C280 first legal LONG</pre>",
+      sample: "encguard",
     },
     {
       id: "d",
@@ -340,6 +348,11 @@
   function buildVScalar() {
     // cafe + e acute
     return C.encodeText("caf\u00e9", { header: false, nonAscii: "v" });
+  }
+
+  function buildEncodingGuard() {
+    // Illegal LONG overlong of 'A' (U+0041). Decoders MUST reject.
+    return C.fromHex("F503000041");
   }
 
   function buildEmoji() {

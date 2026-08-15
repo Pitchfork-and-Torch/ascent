@@ -14,6 +14,8 @@ LLM tool loops invent ad-hoc markers (`<<TOOL>>`, JSON side-channels, markdown f
 if byte < 0x80 -> classic 7-bit ASCII, width 1, forever
 ```
 
+Decoders MUST reject LONG (`F5 03` + u24be) for `cp < 0x80` (overlong ASCII) and for any scalar that fits a shorter ASCENT-V form. See [ENCODING-GUARD.md](ENCODING-GUARD.md).
+
 Prefer **ASCENT-7** for any text you fully control (prompts, logs, shell). Use agent/MM frames only when you need typed control or media.
 
 ## Minimal loop
@@ -147,4 +149,4 @@ Parity / CRC fail => **erase unit** (no mojibake). Python: `ascent_d.encode_p9` 
 
 - [SPEC.md](../SPEC.md) - normative draft  
 - [design/AEGIR.md](../design/AEGIR.md) - PQ companion envelopes  
-- Live Nexus Wire Lab 2.0 - composers for ROLE/TOOL/THINK/SAFETY and MM
+- Live Nexus Wire Lab 3.0 - composers for ROLE/TOOL/THINK/SAFETY and MM; Encoding guard sample rejects overlong LONG

@@ -47,6 +47,10 @@ FLAG_RESERVED_MASK = 0xE0
 ELEV_ABSENT = 0x7FFF
 OBSTRUCTION_ABSENT = 0xFF
 
+# First scalar that requires LONG (F5 03 + u24be). 4-byte residual
+# v = cp - 0x4280 fits while v < (5 << 15); max 4-byte cp is U+2C27F.
+ASCENT_V_LONG_MIN = 0x2C280
+
 # Hex from SPEC.md E.2 (source of truth for interop tests)
 HELLO_UNIVERSE_HEX = (
     "415343454E542F312E300A48656C6C6F"
@@ -133,6 +137,29 @@ def _reject_surrogate(cp: int) -> None:
         raise AscentCodecError(f"codepoint out of range: {cp:#x}")
 
 
+def long_form_required(cp: int) -> bool:
+    """True iff shortest ASCENT-V form for cp is LONG (F5 03 + u24be)."""
+    if cp < 0x80 or cp > 0x10FFFF:
+        return False
+    if 0xD800 <= cp <= 0xDFFF:
+        return False
+    if cp <= 0x427F:
+        return False
+    return (cp - 0x4280) >= (5 << 15)
+
+
+def _reject_long_scalar(cp: int) -> None:
+    """SPEC C.4.1: LONG payload MUST be a scalar that cannot use a shorter form."""
+    if 0xD800 <= cp <= 0xDFFF:
+        raise AscentCodecError(f"surrogate on wire U+{cp:04X}")
+    if cp > 0x10FFFF:
+        raise AscentCodecError(f"scalar out of range U+{cp:04X}")
+    if cp < 0x80:
+        raise AscentCodecError(f"overlong ASCII via LONG form U+{cp:04X}")
+    if not long_form_required(cp):
+        raise AscentCodecError(f"non-minimal LONG form for U+{cp:04X}")
+
+
 def encode_scalar(cp: int) -> List[int]:
     """
     Encode one Unicode scalar to ASCENT wire bytes (list of ints 0..255).
@@ -158,7 +185,7 @@ def encode_scalar(cp: int) -> List[int]:
         return [b0, b1, b2]
 
     # 4-byte: U+4280.. when v fits in 18 bits with top field 0..4 (F0-F4)
-    # Max v = (5 << 15) - 1 => max cp = 0x4280 + 0x27FFF = 0x2C07F
+    # Max v = (5 << 15) - 1 => max cp = 0x4280 + 0x27FFF = 0x2C27F
     v = cp - 0x4280
     if 0 <= v < (5 << 15):
         top = v >> 15  # 0..4
@@ -239,10 +266,7 @@ def decode_ascent_v_at(
         if i + 4 >= n:
             raise AscentCodecError(f"truncated F5 03 u24 at {i}")
         cp = (data[i + 2] << 16) | (data[i + 3] << 8) | data[i + 4]
-        if 0xD800 <= cp <= 0xDFFF:
-            raise AscentCodecError(f"surrogate on wire U+{cp:04X}")
-        if cp > 0x10FFFF:
-            raise AscentCodecError(f"scalar out of range U+{cp:04X}")
+        _reject_long_scalar(cp)
         return cp, i + 5
 
     return None

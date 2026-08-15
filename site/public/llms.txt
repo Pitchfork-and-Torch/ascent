@@ -25,7 +25,7 @@ ASCENT is the encoding contract that refuses to forget ASCII while remaining age
 
 ## Parse law
 
-If a byte is less than 0x80, it is classic 7-bit ASCII, width 1, forever. Overlong encodings of ASCII are illegal.
+If a byte is less than 0x80, it is classic 7-bit ASCII, width 1, forever. Overlong encodings of ASCII are illegal. LONG F5 03 + u24be MUST reject cp < 0x80 and any scalar that fits a shorter 2/3/4-byte form (first legal LONG is U+2C280).
 
 ## Profiles
 
@@ -38,6 +38,7 @@ If a byte is less than 0x80, it is classic 7-bit ASCII, width 1, forever. Overlo
 ## Nexus Wire Lab 3.0 features
 
 - Dual text/hex live sync, color byte map, hex dump, decoded units
+- Encoding guard sample: LONG F5 03 overlong ASCII / non-minimal width hard-fault
 - Command palette (Ctrl/Cmd+K), focus lab, compact density
 - Mission HUD + stream timeline for captain-log / mixed streams
 - Agent frame composer (ROLE TOOL THINK HANDOFF CAP SAFETY STOP)

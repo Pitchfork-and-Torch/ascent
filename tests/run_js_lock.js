@@ -154,6 +154,41 @@ function main() {
     "freeze hello universe"
   );
 
+  // Encoding guard: LONG overlong ASCII + non-minimal width (SPEC C.4.1)
+  var guard = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "tests", "encoding_guard_vectors.json"), "utf8")
+  );
+  ok(C.ASCENT_V_LONG_MIN === 0x2c280, "ASCENT_V_LONG_MIN U+2C280");
+  ok(C.longFormRequired(0x2c280) === true, "LONG required at U+2C280");
+  ok(C.longFormRequired(0x2c27f) === false, "LONG not required at U+2C27F");
+  Object.keys(guard).forEach(function (name) {
+    var case_ = guard[name];
+    if (!case_ || typeof case_ !== "object" || !case_.hex) return;
+    var raw = C.fromHex(case_.hex);
+    if (case_.reject) {
+      var threw = false;
+      var msg = "";
+      try {
+        C.decodeAscentVAt(raw, 0);
+      } catch (e) {
+        threw = true;
+        msg = String(e.message || e).toLowerCase();
+      }
+      ok(threw && msg.indexOf(case_.reject) >= 0, name + " reject " + case_.reject);
+      var streamThrew = false;
+      try {
+        C.decodeStream(raw);
+      } catch (e2) {
+        streamThrew = true;
+      }
+      ok(streamThrew, name + " decodeStream reject");
+      return;
+    }
+    var got = C.decodeAscentVAt(raw, 0);
+    ok(got && got.cp === case_.cp, name + " decode cp");
+    ok(C.hexOf(new Uint8Array(C.encodeScalar(case_.cp))).toLowerCase() === case_.hex.toLowerCase(), name + " encode lock");
+  });
+
   // SkyPulse PATHHINT goldens
   var sky = JSON.parse(
     fs.readFileSync(path.join(ROOT, "tests", "skypulse_vectors.json"), "utf8")

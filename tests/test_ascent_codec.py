@@ -16,13 +16,16 @@ if str(REF) not in sys.path:
 
 from ascent_codec import (  # noqa: E402
     AscentCodecError,
+    ASCENT_V_LONG_MIN,
     HELLO_UNIVERSE_HEX,
     encode_text,
     encode_text_ascent7,
     encode_scalar,
+    decode_ascent_v_at,
     decode_stream,
     events_to_jsonable,
     hello_universe_bytes,
+    long_form_required,
     Cont,
     cont_byte,
     cont_val,
@@ -30,6 +33,7 @@ from ascent_codec import (  # noqa: E402
 
 
 VECTORS_PATH = Path(__file__).with_name("test_vectors.json")
+GUARD_PATH = Path(__file__).with_name("encoding_guard_vectors.json")
 
 
 def load_vectors():
@@ -171,6 +175,50 @@ def test_events_kind_strings_only():
     print("PASS test_events_kind_strings_only")
 
 
+def test_encoding_guard_long():
+    guard = json.loads(GUARD_PATH.read_text(encoding="utf-8"))
+    assert ASCENT_V_LONG_MIN == 0x2C280
+    assert long_form_required(0x2C280)
+    assert not long_form_required(0x2C27F)
+    assert not long_form_required(0x41)
+    assert not long_form_required(0xE9)
+    assert not long_form_required(0x1F680)
+
+    for name, case in guard.items():
+        if name == "note" or not isinstance(case, dict):
+            continue
+        raw = bytes.fromhex(case["hex"])
+        if case.get("reject"):
+            try:
+                decode_ascent_v_at(raw, 0)
+                raise AssertionError(f"{name}: expected reject, decoded")
+            except AscentCodecError as ex:
+                msg = str(ex).lower()
+                needle = case["reject"]
+                assert needle in msg, f"{name}: wanted {needle!r} in {ex}"
+            try:
+                decode_stream(raw)
+                raise AssertionError(f"{name}: decode_stream should reject")
+            except AscentCodecError:
+                pass
+            if case.get("shortest_hex"):
+                # shortest form still decodes
+                short = bytes.fromhex(case["shortest_hex"])
+                cp, end = decode_ascent_v_at(short, 0)
+                assert end == len(short)
+                assert cp > 0x7F
+            continue
+        cp, end = decode_ascent_v_at(raw, 0)
+        assert cp == case["cp"], f"{name}: cp {cp:#x} != {case['cp']:#x}"
+        assert end == len(raw)
+        assert bytes(encode_scalar(cp)) == raw, f"{name}: encode/decode lock"
+
+    # last 4-byte must not be emitted as LONG
+    last4 = bytes.fromhex(guard["last_4byte_2c27f"]["hex"])
+    assert bytes(encode_scalar(0x2C27F)) == last4
+    print("PASS test_encoding_guard_long")
+
+
 def test_cont_frozen():
     assert cont_byte(0) == 0xA0
     assert cont_byte(0x1F) == 0xBF
@@ -193,6 +241,7 @@ def main() -> int:
     test_surrogate_raises()
     test_ascent7_rejects_non_ascii()
     test_events_kind_strings_only()
+    test_encoding_guard_long()
     test_cont_frozen()
     print("ALL TESTS PASS")
     return 0

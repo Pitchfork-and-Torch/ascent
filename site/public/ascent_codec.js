@@ -20,6 +20,8 @@
 
   var HEADER_MAGIC = "ASCENT/1.0\n";
   var PLANE_P3 = 0x03;
+  // First scalar that requires LONG (F5 03 + u24be). Max 4-byte cp is U+2C27F.
+  var ASCENT_V_LONG_MIN = 0x2c280;
 
   var LEAD_SKYSTATE = 0xc5;
   var PATHHINT_SCHEMA_V1 = 0x01;
@@ -284,6 +286,38 @@
     }
   }
 
+  function longFormRequired(cp) {
+    if (cp < 0x80 || cp > 0x10ffff) return false;
+    if (cp >= 0xd800 && cp <= 0xdfff) return false;
+    if (cp <= 0x427f) return false;
+    return cp - 0x4280 >= 5 << 15;
+  }
+
+  function rejectLongScalar(cp) {
+    if (cp >= 0xd800 && cp <= 0xdfff) {
+      throw new AscentError(
+        "surrogate on wire U+" + cp.toString(16).toUpperCase()
+      );
+    }
+    if (cp > 0x10ffff) {
+      throw new AscentError(
+        "scalar out of range U+" + cp.toString(16).toUpperCase()
+      );
+    }
+    if (cp < 0x80) {
+      throw new AscentError(
+        "overlong ASCII via LONG form U+" +
+          cp.toString(16).toUpperCase().padStart(4, "0")
+      );
+    }
+    if (!longFormRequired(cp)) {
+      throw new AscentError(
+        "non-minimal LONG form for U+" +
+          cp.toString(16).toUpperCase().padStart(4, "0")
+      );
+    }
+  }
+
   function encodeScalar(cp) {
     rejectSurrogate(cp);
     if (cp < 0x80) return [cp];
@@ -304,7 +338,7 @@
       ];
     }
 
-    // 4-byte: U+4280.. when v fits in 18 bits with top 0..4 (max cp U+2C07F)
+    // 4-byte: U+4280.. when v fits in 18 bits with top 0..4 (max cp U+2C27F)
     var v4 = cp - 0x4280;
     if (v4 >= 0 && v4 < (5 << 15)) {
       var top = v4 >> 15; // 0..4
@@ -381,16 +415,7 @@
       if (i + 4 >= n) throw new AscentError("truncated F5 03 u24 at " + i);
       var cp =
         (data[i + 2] << 16) | (data[i + 3] << 8) | data[i + 4];
-      if (cp >= 0xd800 && cp <= 0xdfff) {
-        throw new AscentError(
-          "surrogate on wire U+" + cp.toString(16).toUpperCase()
-        );
-      }
-      if (cp > 0x10ffff) {
-        throw new AscentError(
-          "scalar out of range U+" + cp.toString(16).toUpperCase()
-        );
-      }
+      rejectLongScalar(cp);
       return { cp: cp, end: i + 5 };
     }
 
@@ -1454,6 +1479,8 @@
     contVal: contVal,
     encodeScalar: encodeScalar,
     decodeAscentVAt: decodeAscentVAt,
+    longFormRequired: longFormRequired,
+    ASCENT_V_LONG_MIN: ASCENT_V_LONG_MIN,
     encodeText: encodeText,
     encodeAgentFrame: encodeAgentFrame,
     encodeRoleFrame: encodeRoleFrame,
