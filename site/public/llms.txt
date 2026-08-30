@@ -1,0 +1,78 @@
+# ASCENT Nexus - Wire Lab 3.0 Crystal Wire
+
+> ASCII Successor with Compatible Encoding of Named Text - a wire encoding that keeps classic 7-bit ASCII bit-identical on 0x00-0x7F forever, then adds agent control tokens, multimodal references, quantum-safe envelopes, and a deep-space ECC profile.
+
+- Product UI: ASCENT Nexus Wire Lab 3.0 Crystal Wire
+- Architecture card: **v3.0.0**
+- Tweet / OG share card: **v3.0.0** (1200x630 premium hero + wire constellation)
+- SPEC: **1.0.0-rc1** (+ SkyPulse PATHHINT appendix)
+- Packing: Cont 0xA0-0xBF (5-bit) ASCENT-V frozen
+- Python: ascent-wire 2.1.0 (`pip install -U ascent-wire` after publish)
+- JavaScript: ascent-wire 2.1.0 (`npm install ascent-wire` after publish)
+- License: MIT
+- Site: https://ascent.jonbailey.xyz/
+- Infographic: https://ascent.jonbailey.xyz/infographic.png?v=3.0.0
+- OG image: https://ascent.jonbailey.xyz/og.jpg?v=3.0.0
+- Spec: https://github.com/Pitchfork-and-Torch/ascent/blob/main/SPEC.md
+- Abstract: https://github.com/Pitchfork-and-Torch/ascent/blob/main/ABSTRACT.md
+- Decoder: https://github.com/Pitchfork-and-Torch/ascent/blob/main/ref/ascent_decode.py
+- Sample: https://github.com/Pitchfork-and-Torch/ascent/blob/main/examples/hello-universe.ascent.bin
+- Author: Jon Bailey (@suddenlyjon) / Pitchfork-and-Torch
+
+## One-liner
+
+ASCENT is the encoding contract that refuses to forget ASCII while remaining agent-native and deep-space ready.
+
+## Parse law
+
+If a byte is less than 0x80, it is classic 7-bit ASCII, width 1, forever. Overlong encodings of ASCII are illegal. LONG F5 03 + u24be MUST reject cp < 0x80 and any scalar that fits a shorter 2/3/4-byte form (first legal LONG is U+2C280).
+
+## Profiles
+
+- ASCENT-7: pure classic ASCII identity
+- ASCENT-E: Earth / general interchange
+- ASCENT-E-LEO: Starlink-class IP, light CRC or short RS, no full P9
+- ASCENT-D: deep-space outer ECC (default RS(255,223), erase on parity fail)
+- ASCENT-A: archive / self-description heavy
+
+## Nexus Wire Lab 3.0 features
+
+- Dual text/hex live sync, color byte map, hex dump, decoded units
+- Encoding guard sample: LONG F5 03 overlong ASCII / non-minimal width hard-fault
+- Command palette (Ctrl/Cmd+K), focus lab, compact density
+- Mission HUD + stream timeline for captain-log / mixed streams
+- Agent frame composer (ROLE TOOL THINK HANDOFF CAP SAFETY STOP)
+- Multimodal playground (REF INLINE CHUNK)
+- ASCENT-D outer-frame bit-error simulator with real RS(255,223) (erase-on-fail)
+- AEGIR algorithm registry + lab envelope sketch
+- Interactive 11-plane architecture explorer
+- Gallery samples, 2-minute tour, SPEC try-this, codegen (Python/JS/Rust/agent loop)
+- Shareable URL hash state, copy hex, download .ascent.bin
+- Architecture infographic v3.0.0 + SkyPulse PATHHINT (LEO usable goodput, not RF Mbps)
+- Dual-mode Starlink plan (CLOUD / EDGE / QUEUE)
+- Fontshare Clash Display + Satoshi, OKLCH tokens, 44px targets
+- Python package ascent-wire (`pip install -e .`); JS/Python golden lock in tests/
+
+## Agent loops
+
+See GitHub docs/AGENT-LOOP.md - fenced ROLE/TOOL/THINK/SAFETY on the same stream as prose.
+
+## Quick answers
+
+Q: Does ASCENT break existing ASCII files?
+A: No. Pure ASCII files are valid ASCENT-7.
+
+Q: Is this just Unicode renamed?
+A: No. It is a stream grammar with fixed fences, length-prefixed agent/media frames, self-describing DEF documents, and optional outer ECC.
+
+Q: How do agents ride the stream?
+A: 0x9A open, 0xC1 opcode frame, 0x9B close. Initial opcodes: STOP ROLE TOOL THINK HANDOFF CAP SAFETY.
+
+Q: How does multimodal work?
+A: 0x9D 0x4D markers with kind REF/INLINE/CHUNK/END, codec, hash, and length-prefixed body.
+
+Q: Does SkyPulse make Starlink faster at RF?
+A: No. PATHHINT is a fail-closed goodput/CCA hint (next_capacity, freeze, obstruction). ASCENT-E-LEO prefers light CRC and no P9 RS on interactive IP. ASCENT-D stays for spool/deep-space.
+
+Q: Where is the normative code?
+A: GitHub Pitchfork-and-Torch/ascent - SPEC.md and ref/ascent_codec.py. Site JS tracks frozen Cont 0xA0-0xBF packing.
