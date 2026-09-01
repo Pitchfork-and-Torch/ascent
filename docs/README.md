@@ -2,7 +2,7 @@
 
 | File | Use |
 |------|-----|
-| [ascent-infographic.png](ascent-infographic.png) | Full architecture card v2.1.0 (README + site; regen PNG on deploy) |
+| [ascent-infographic.png](ascent-infographic.png) | Full architecture card v3.0.0 Crystal Wire (README + site) |
 | [ascent-infographic.jpg](ascent-infographic.jpg) | JPEG twin |
 | [ascent-infographic-banner.jpg](ascent-infographic-banner.jpg) | Wide header / social crop |
 | [series/](series/) | 8-panel integration explainer series |
@@ -14,7 +14,7 @@
 | [SPEC-FREEZE-1.0-RC.md](SPEC-FREEZE-1.0-RC.md) | 1.0-RC freeze checklist |
 | [ENCODING-GUARD.md](ENCODING-GUARD.md) | LONG overlong / non-minimal reject (SPEC C.4.1) |
 
-**Current card:** ASCENT Nexus Wire Lab 2.0 · architecture **v2.1.0** (SkyPulse)
+**Current card:** ASCENT Nexus Wire Lab 3.0 Crystal Wire · architecture **v3.0.0** (SkyPulse wire remains ascent-wire 2.1.0)
 
 ## Integration series (Desktop + docs)
 
@@ -30,7 +30,7 @@ Writes PNG/JPG to `Desktop/ASCENT-infographics/` and `docs/series/`.
 |-------|--------|
 | 01 | What is ASCENT |
 | 02 | Integration stack |
-| 03 | Wire Lab 2.0 |
+| 03 | Wire Lab 2.0 (historical series title; current lab is 3.0 Crystal Wire) |
 | 04 | Agent loop |
 | 05 | ASCENT-D erase-on-fail |
 | 06 | Package + golden lock |

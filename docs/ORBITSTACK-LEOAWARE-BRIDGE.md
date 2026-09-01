@@ -1,7 +1,7 @@
 # OrbitStack / LeoAware bridge (PATHHINT)
 
 **Status:** Implementer note for Pitchfork-and-Torch OrbitStack. Not a product claim.  
-**ASCENT side:** SkyPulse PATHHINT (`0xC5` schema `0x01`), architecture **2.1.0**  
+**ASCENT side:** SkyPulse PATHHINT (`0xC5` schema `0x01`), wire **2.1.0**; Nexus architecture card **3.0.0** Crystal Wire  
 **Honesty:** PATHHINT does not raise Starlink RF Mbps. Dual-gate LeoAware remains
 a **product fence** for paid OrbitStack; this document does not grant it.
 ASCENT ship success is goldens / round-trip / erase-on-fail / overhead / apply

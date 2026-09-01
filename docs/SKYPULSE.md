@@ -1,6 +1,6 @@
 # ASCENT SkyPulse
 
-**Status:** Additive (architecture card / ascent-wire **2.1.0**). SPEC 1.0.0-rc1 parse law unchanged.  
+**Status:** Additive (ascent-wire **2.1.0**; Nexus architecture card **3.0.0** Crystal Wire). SPEC 1.0.0-rc1 parse law unchanged.  
 **Unit:** PATHHINT / SKYSTATE (`0xC5`, schema `0x01`)  
 **Profiles:** usage note **ASCENT-E-LEO** vs **ASCENT-D** (not a new P0-P2 grammar)
 
@@ -120,7 +120,7 @@ Separate from LeoAware dual-gate. **Not** "+X Mbps Starlink."
 
 1. SPEC appendix + goldens + ascent-wire **2.1.0**
 2. Wire Lab panel (meters labeled **sim**)
-3. Publish PATHHINT codec (PyPI/npm later; Jon gated)
+3. Publish PATHHINT codec (done: ascent-wire 2.1.0 on PyPI/npm)
 4. LeoAware later (OrbitStack product; not this PR)
 
 Do not claim OrbitStack paid wins. Live site deploy still needs Jon approval.

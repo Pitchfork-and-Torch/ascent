@@ -87,6 +87,22 @@
         "@type": "Answer",
         "text": "No. PATHHINT is a fail-closed usable-session-bandwidth / CCA hint (next_capacity, freeze, obstruction). It does not raise Starlink physical RF Mbps. ASCENT-E-LEO prefers light CRC and no full P9 on interactive IP. ASCENT-D stays for spool and deep space."
       }
+    },
+    {
+      "@type": "Question",
+      "name": "Which version should I cite?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Three surfaces, on purpose: SPEC 1.0.0-rc1 is the wire law. Nexus / architecture card is 3.0.0 Crystal Wire (UI). Packages ascent-wire 2.1.0 are published on PyPI and npm. A UI card bump does not move the codec or thaw the RC freeze."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does ASCENT unlock OrbitStack dual-gate?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. PATHHINT is an open fail-closed hint. Dual-gate remains a paid OrbitStack product fence. This lab does not implement, enable, or claim dual-gate wins."
+      }
     }
   ]
 }
@@ -523,7 +539,7 @@
   <section id="install">
     <div class="sec-label">Install</div>
     <h2>Use the codec, not only the lab.</h2>
-    <p class="lede">SPEC <strong>1.0.0-rc1</strong> is frozen for implementers. Package name <strong>ascent-wire</strong> ships on <strong>PyPI</strong> (Python) and <strong>npm</strong> (JavaScript), both 2.1.0 in-repo (publish gated). Nexus UI is <strong>3.0.0 Crystal Wire</strong>.</p>
+    <p class="lede">SPEC <strong>1.0.0-rc1</strong> is frozen for implementers. <strong>ascent-wire 2.1.0</strong> is published on <strong>PyPI</strong> (Python) and <strong>npm</strong> (JavaScript). Nexus UI is <strong>3.0.0 Crystal Wire</strong>.</p>
     <div class="grid-2">
       <div class="panel">
         <div class="panel-title">Python (PyPI)</div>
@@ -675,6 +691,14 @@ ASCENT-D: full RS(255,223) P9 for spool / deep-space / high-BER only</pre>
       <details class="faq-item">
         <summary>Does SkyPulse make Starlink faster at RF?</summary>
         <p>No. PATHHINT is a fail-closed usable-session-bandwidth / CCA hint. It does not raise physical RF Mbps. ASCENT-E-LEO uses light integrity on interactive IP. ASCENT-D is for spool and deep space.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Which version should I cite?</summary>
+        <p>Three surfaces, on purpose: SPEC <strong>1.0.0-rc1</strong> is the wire law. Nexus / architecture card is <strong>3.0.0 Crystal Wire</strong> (UI). Packages <strong>ascent-wire 2.1.0</strong> are published on PyPI and npm. A UI card bump does not move the codec or thaw the RC freeze.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Does ASCENT unlock OrbitStack dual-gate?</summary>
+        <p>No. PATHHINT is an open fail-closed hint. Dual-gate remains a paid OrbitStack product fence. This lab does not implement, enable, or claim dual-gate wins.</p>
       </details>
     </div>
   </section>

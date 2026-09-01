@@ -28,4 +28,13 @@ Allow: /
 User-agent: LinkedInBot
 Allow: /
 
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
 Sitemap: https://ascent.jonbailey.xyz/sitemap.xml

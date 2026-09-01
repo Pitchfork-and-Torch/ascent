@@ -29,6 +29,8 @@ jobs:
         run: python tests/test_skypulse.py
       - name: CLI self-test
         run: python -m ascent self-test
+      - name: Advertised version surfaces
+        run: python tests/test_version_surfaces.py
 
   js-lock:
     runs-on: ubuntu-latest

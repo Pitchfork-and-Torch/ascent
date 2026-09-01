@@ -4,7 +4,7 @@
 **Status:** Research synthesis + implementable architecture (v0.2, SkyPulse)  
 **Date:** 2026-08-12  
 **Scope:** Public evidence only. Legal stock Starlink kit. No RF hacks.  
-**Product hooks:** Pitchfork-and-Torch/ascent SPEC 1.0.0-rc1, `ascent-wire` 2.1.0, SkyPulse PATHHINT, live Wire Lab.
+**Product hooks:** Pitchfork-and-Torch/ascent SPEC 1.0.0-rc1, `ascent-wire` 2.1.0, SkyPulse PATHHINT, live Wire Lab 3.0 Crystal Wire.
 
 ASCII hyphens only in this document.
 

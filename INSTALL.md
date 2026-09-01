@@ -1,6 +1,6 @@
 # Install ASCENT
 
-**SPEC:** 1.0.0-rc1 · **Nexus / packages:** 2.1.0 · MIT
+**SPEC:** 1.0.0-rc1 · **Nexus:** 3.0.0 Crystal Wire · **ascent-wire:** 2.1.0 · MIT
 
 ## Python (`ascent-wire`)
 
@@ -80,8 +80,8 @@ node tests/run_js_lock.js
 
 | Registry | Status |
 |----------|--------|
-| **PyPI** `ascent-wire` | **In-repo 2.1.0** (publish on Jon release) |
-| **npm** `ascent-wire` | **In-repo 2.1.0** (publish on Jon release) |
+| **PyPI** `ascent-wire` | **Published 2.1.0** |
+| **npm** `ascent-wire` | **Published 2.1.0** |
 | GitHub Releases | Wheel + sdist also attached |
 | Trusted Publishing | `.github/workflows/publish-pypi.yml` (OIDC on release) |
 

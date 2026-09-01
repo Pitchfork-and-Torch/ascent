@@ -2,7 +2,9 @@
 
 **Goal:** Freeze implementer-critical wire forms so multi-language codecs stay bit-identical.  
 **SPEC status today:** `1.0.0-rc1`  
-**Architecture / Nexus site:** `2.1.0` (SkyPulse additive; Cont freeze unchanged)  
+**Architecture / Nexus site (at RC):** `2.1.0` (SkyPulse additive; Cont freeze unchanged)  
+**Current Nexus / architecture card:** `3.0.0` Crystal Wire (UI only; did not thaw Cont or P9)  
+**Current wire packages:** `ascent-wire` 2.1.0 on PyPI and npm  
 **Packing:** Cont `0xA0-0xBF` (5-bit) frozen  
 **RC date:** 2026-07-31  
 
@@ -94,9 +96,9 @@ py -3 -c "exec(open('tests/gen_freeze_vectors.py',encoding='utf-8').read())"
 ## After RC
 
 1. Tag SPEC `1.0.0-rc1` in SPEC.md header (content freeze)  
-2. Keep Nexus site on 2.x for UI-only bumps  
-3. Publish `ascent-wire` to PyPI when package metadata reviewed  
-4. Add npm `@pitchfork/ascent` mirroring `site/public/ascent_codec.js`  
+2. Nexus UI may bump independently (shipped 3.0.0 Crystal Wire; Cont/P9 stay frozen)  
+3. `ascent-wire` 2.1.0 published on PyPI and npm  
+4. JS package name is `ascent-wire` (mirrors `site/public/ascent_codec.js`)  
 
 ## Explicitly still draft (OK for RC)
 

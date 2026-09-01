@@ -7,8 +7,8 @@
 - Tweet / OG share card: **v3.0.0** (1200x630 premium hero + wire constellation)
 - SPEC: **1.0.0-rc1** (+ SkyPulse PATHHINT appendix)
 - Packing: Cont 0xA0-0xBF (5-bit) ASCENT-V frozen
-- Python: ascent-wire 2.1.0 (`pip install -U ascent-wire` after publish)
-- JavaScript: ascent-wire 2.1.0 (`npm install ascent-wire` after publish)
+- Python: ascent-wire 2.1.0 published (`pip install ascent-wire`)
+- JavaScript: ascent-wire 2.1.0 published (`npm install ascent-wire`)
 - License: MIT
 - Site: https://ascent.jonbailey.xyz/
 - Infographic: https://ascent.jonbailey.xyz/infographic.png?v=3.0.0
@@ -76,3 +76,9 @@ A: No. PATHHINT is a fail-closed goodput/CCA hint (next_capacity, freeze, obstru
 
 Q: Where is the normative code?
 A: GitHub Pitchfork-and-Torch/ascent - SPEC.md and ref/ascent_codec.py. Site JS tracks frozen Cont 0xA0-0xBF packing.
+
+Q: Which version should I cite?
+A: SPEC 1.0.0-rc1 is the wire law. Nexus / architecture card is 3.0.0 Crystal Wire (UI). Packages ascent-wire 2.1.0 are published on PyPI and npm. A UI card bump does not move the codec or thaw the RC freeze.
+
+Q: Does ASCENT unlock OrbitStack dual-gate?
+A: No. PATHHINT is an open fail-closed hint. Dual-gate remains a paid OrbitStack product fence. This repo does not implement, enable, or claim dual-gate wins.

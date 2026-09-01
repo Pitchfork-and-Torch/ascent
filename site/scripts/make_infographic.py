@@ -216,7 +216,7 @@ def main() -> None:
         draw.text((76, yy), line, font=f_mono, fill=(190, 200, 220, 255))
         yy += 24
 
-    # Dual-mode resilience plan (new for 2.0.3)
+    # Dual-mode resilience plan
     draw.text(
         (56, 1172),
         "DUAL-MODE RESILIENCE  ·  GROK + STARLINK + ASCENT",

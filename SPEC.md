@@ -2,7 +2,8 @@
 
 **Status:** Release Candidate for implementer freeze  
 **Version:** 1.0.0-rc1  
-**Nexus / architecture card:** 2.1.0 (SkyPulse)  
+**Nexus / architecture card:** 3.0.0 Crystal Wire  
+**Wire packages (PyPI/npm ascent-wire):** 2.1.0  
 **Freeze companions:** `docs/SPEC-FREEZE-1.0-RC.md`, `tests/freeze_vectors.json`, `node tests/run_js_lock.js`  
 **Parse law (eternal):** if a byte is less than `0x80`, it is classic 7-bit ASCII, bit-identical, forever.
 

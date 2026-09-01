@@ -193,7 +193,7 @@ ref/ascent_decode.py    Earth-profile reference decoder
 ref/ascent_skypulse.py  PATHHINT policy + LEO-IP vs D integrity
 ref/aegir_sketch.py     AEGIR encrypt/decrypt sketch (DEMO + optional DCH-768)
 examples/               Canonical .bin samples (incl. skypulse-pathhint)
-site/public/            Live Nexus Wire Lab 2.0 (Cloudflare Pages)
+site/public/            Live Nexus Wire Lab 3.0 Crystal Wire (Cloudflare Pages)
 tests/                  Python goldens + JS lock
 design/                 Non-normative design provenance (incl. AEGIR)
 assets/masters/         Source OG + infographic masters
@@ -203,7 +203,7 @@ assets/masters/         Source OG + infographic masters
 |------|---------|
 | [SPEC.md](SPEC.md) | Full normative draft |
 | [ABSTRACT.md](ABSTRACT.md) | RFC-style one-pager |
-| [docs/ascent-infographic.png](docs/ascent-infographic.png) | Architecture infographic v2.1.0 (SkyPulse; PNG may still show 2.0.3 until regen) |
+| [docs/ascent-infographic.png](docs/ascent-infographic.png) | Architecture infographic v3.0.0 Crystal Wire |
 | [docs/SKYPULSE.md](docs/SKYPULSE.md) | SkyPulse PATHHINT what/why/non-claims |
 | [docs/GROK-ASCENT-STARLINK-ARCHITECTURE.md](docs/GROK-ASCENT-STARLINK-ARCHITECTURE.md) | Grok over ASCENT over Starlink design package |
 | [docs/ORBITSTACK-LEOAWARE-BRIDGE.md](docs/ORBITSTACK-LEOAWARE-BRIDGE.md) | How LeoAware should consume PATHHINT |
