@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASCENT Nexus - Wire Lab 3.0 Crystal Wire</title>
+<meta name="description" content="ASCENT Nexus Wire Lab 3.0 Crystal Wire: interactive playground for the ASCII-successor wire standard. Sacred parse law, agent frames, multimodal units, SkyPulse PATHHINT, ASCENT-D erase-on-fail, command palette, and mission HUD.">
+<link rel="canonical" href="https://ascent.jonbailey.xyz/">
+<meta name="theme-color" content="#12141c">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ASCENT Nexus">
+<meta property="og:title" content="ASCENT Nexus - Wire Lab 3.0 Crystal Wire">
+<meta property="og:description" content="Living wire standard playground. Parse law: byte &lt; 0x80 is classic ASCII forever. Agents, multimodal, SkyPulse, deep-space ECC lab.">
+<meta property="og:url" content="https://ascent.jonbailey.xyz/">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://ascent.jonbailey.xyz/og.jpg?v=3.0.0">
+<meta property="og:image:secure_url" content="https://ascent.jonbailey.xyz/og.jpg?v=3.0.0">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ASCENT Nexus Crystal Wire - ASCII successor. Byte-identical 0-127 forever.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@suddenlyjon">
+<meta name="twitter:creator" content="@suddenlyjon">
+<meta name="twitter:title" content="ASCENT Nexus - Wire Lab 3.0 Crystal Wire">
+<meta name="twitter:description" content="Byte-identical 0-127 forever. Agents, multimodal, SkyPulse, deep-space lab. Cmd+K palette.">
+<meta name="twitter:image" content="https://ascent.jonbailey.xyz/og.jpg?v=3.0.0">
+<meta name="twitter:image:alt" content="ASCENT Nexus v3.0.0 Crystal Wire share card">
+<link rel="alternate" type="text/plain" href="/llms.txt">
+<link rel="preload" href="/fonts/fontshare/clash-display/woff2/ClashDisplay-Semibold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/fontshare/satoshi/woff2/Satoshi-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css?v=3.0.0">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ASCENT Nexus Wire Lab 3.0",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Any",
+  "softwareVersion": "3.0.0",
+  "description": "ASCENT Nexus Wire Lab 3.0 Crystal Wire - interactive lab for ASCII Successor with Compatible Encoding of Named Text. Sacred P0 identity, SkyPulse PATHHINT, agent fences, multimodal, ASCENT-D, command palette, mission HUD.",
+  "url": "https://ascent.jonbailey.xyz/",
+  "image": "https://ascent.jonbailey.xyz/og.jpg?v=3.0.0",
+  "license": "https://opensource.org/licenses/MIT",
+  "author": {
+    "@type": "Organization",
+    "name": "Pitchfork and Torch",
+    "url": "https://github.com/Pitchfork-and-Torch"
+  },
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is ASCENT?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "ASCENT (ASCII Successor with Compatible Encoding of Named Text) is a wire encoding and control grammar that keeps classic 7-bit ASCII bit-identical on bytes 0-127 forever, while adding agent control tokens, multimodal references, quantum-safe control envelopes, and a deep-space ECC profile."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does ASCENT break existing ASCII files?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Pure classic ASCII files are valid ASCENT-7. The parse law states that any byte less than 0x80 is classic ASCII, width 1, forever. Greppers, shebangs, and SMTP 7-bit paths remain correct on that subset."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is ASCENT Nexus Wire Lab 3.0?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The interactive public face of ASCENT (v3.0.0 Crystal Wire): dual text/hex live sync, SkyPulse PATHHINT, agent and multimodal composers, ASCENT-D bit-error erase-on-fail simulator, AEGIR sketch, eleven-plane explorer, command palette, mission HUD, stream timeline, guided tour, and codegen snippets."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does SkyPulse make Starlink faster at RF?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. PATHHINT is a fail-closed usable-session-bandwidth / CCA hint (next_capacity, freeze, obstruction). It does not raise Starlink physical RF Mbps. ASCENT-E-LEO prefers light CRC and no full P9 on interactive IP. ASCENT-D stays for spool and deep space."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which version should I cite?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Three surfaces, on purpose: SPEC 1.0.0-rc1 is the wire law. Nexus / architecture card is 3.0.0 Crystal Wire (UI). Packages ascent-wire 2.1.0 are published on PyPI and npm. A UI card bump does not move the codec or thaw the RC freeze."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does ASCENT unlock OrbitStack dual-gate?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. PATHHINT is an open fail-closed hint. Dual-gate remains a paid OrbitStack product fence. This lab does not implement, enable, or claim dual-gate wins."
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#lab">Skip to Wire Lab</a>
+<a class="skip-link" href="#cmdk-input">Skip to command palette</a>
+
+<nav class="topnav" aria-label="Primary">
+  <div class="topnav-left">
+    <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <a class="topnav-brand" href="#top">
+      <span class="mark" aria-hidden="true"></span>
+      ASCENT NEXUS
+      <span class="brand-ver">3.0</span>
+    </a>
+    <a class="btn-x-nav" href="https://x.com/intent/follow?screen_name=suddenlyjon" target="_blank" rel="noopener noreferrer" aria-label="Follow @suddenlyjon on X">
+      <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.725-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/></svg>
+      @suddenlyjon
+    </a>
+  </div>
+  <div class="topnav-links" id="nav-links">
+    <a href="#manifesto">Manifesto</a>
+    <a href="#lab">Wire Lab</a>
+    <a href="#skypulse">SkyPulse</a>
+    <a href="#architecture">Planes</a>
+    <a href="#spec">SPEC</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com/Pitchfork-and-Torch/ascent" rel="noopener">GitHub</a>
+  </div>
+  <div class="topnav-right">
+    <button type="button" class="btn-cmdk" id="btn-cmdk" aria-haspopup="dialog" aria-controls="cmdk">
+      <span class="cmdk-label">Search</span>
+      <kbd>Ctrl K</kbd>
+    </button>
+    <div class="nav-profile">
+      <label for="profile-select">Profile</label>
+      <select id="profile-select" aria-label="ASCENT profile">
+        <option value="E">ASCENT-E</option>
+        <option value="E-LEO">ASCENT-E-LEO</option>
+        <option value="7">ASCENT-7</option>
+        <option value="D">ASCENT-D</option>
+        <option value="A">ASCENT-A</option>
+      </select>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+  <div class="hero-inner">
+    <div class="badge"><span class="dot" aria-hidden="true"></span> Wire Lab 3.0 · Crystal Wire · MIT · SPEC 1.0.0-rc1</div>
+    <h1>The next fifty years of text<br><span class="grad">start with a promise to 1963.</span></h1>
+    <p class="hero-lead">
+      <strong>ASCENT Nexus</strong> is a living instrument for a self-describing stream:
+      humans, agents, media refs, and deep-space links on one wire.
+      Classic ASCII bytes stay sacred. Everything else ascends without burning the stairs.
+    </p>
+    <div class="cta-row">
+      <button type="button" class="btn btn-primary" id="btn-hello">Decode Hello, Universe</button>
+      <a class="btn btn-ghost" href="#lab">Open Wire Lab 3.0</a>
+    </div>
+    <div class="cta-quiet">
+      <button type="button" id="btn-start-tour">2-minute tour</button>
+      <button type="button" id="btn-captain">Load captain log</button>
+      <a href="https://github.com/Pitchfork-and-Torch/ascent" rel="noopener">GitHub</a>
+      <a href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/SPEC.md" rel="noopener">SPEC.md</a>
+    </div>
+    <p class="law-pill">eternal parse law: <em>if byte &lt; 0x80</em> -&gt; classic 7-bit ASCII, width 1, forever</p>
+  </div>
+</header>
+
+<a class="x-follow-float" href="https://x.com/intent/follow?screen_name=suddenlyjon" target="_blank" rel="noopener noreferrer" aria-label="Follow @suddenlyjon on X">
+  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.725-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/></svg>
+  <span>@suddenlyjon</span>
+</a>
+
+<main class="wrap">
+  <section id="manifesto">
+    <div class="sec-label">Manifesto</div>
+    <h2>Keep every classic ASCII byte sacred.</h2>
+    <p class="lede">Then ascend scripts, agents, media refs, quantum-safe control, and deep-space links into one stream - fixed-width control for machines, variable-width data for humans, never remapping <code>0x00-0x7F</code>.</p>
+    <p class="quote">ASCENT is not "Unicode but better." It is a wire contract greppers, shebangs, and SMTP paths can still trust.</p>
+    <div class="tags">
+      <span class="tag">ASCENT-7 identity</span>
+      <span class="tag">agent fences 0x9A..0x9B</span>
+      <span class="tag">multimodal REF</span>
+      <span class="tag">AEGIR / PQ control</span>
+      <span class="tag">ASCENT-D erase-on-fail</span>
+      <span class="tag">SkyPulse PATHHINT</span>
+      <span class="tag">self-describing DEF</span>
+      <span class="tag">Crystal Wire 3.0</span>
+    </div>
+    <div class="panel" style="margin-top:1.25rem" id="sacred">
+      <div class="panel-title">Sacred meter · sim (Wire Lab)</div>
+      <div class="meter-track"><div class="meter-bar" id="sacred-bar"></div></div>
+      <div class="sacred-readout ok" id="sacred-meter" role="status">Waiting for stream (sim)...</div>
+      <p class="form-hint" style="margin-top:0.55rem">Wire Lab meters are <strong>sim</strong>. Observational dish telemetry is not invented here. Also try a quick ASCENT-7 check:</p>
+      <input class="sacred-input" id="sacred-input" type="text" value="#!/usr/bin/env bash echo Hello, Universe." spellcheck="false" aria-label="Type text to check ASCENT-7 identity">
+      <div class="sacred-readout" id="sacred-input-meter" style="margin-top:0.45rem"></div>
+    </div>
+  </section>
+
+  <section id="infographic">
+    <div class="sec-label">Architecture card</div>
+    <h2>The standard in one frame.</h2>
+    <p class="lede">Parse law, planes, Hello Universe stream, profiles, control grammar, and Nexus Wire Lab 3.0 features. Open full size for reading or sharing.</p>
+    <div class="panel">
+      <div class="panel-title">Infographic · v3.0.0 Crystal Wire</div>
+      <a href="/infographic.png?v=3.0.0" target="_blank" rel="noopener">
+        <img
+          src="/infographic.jpg?v=3.0.0"
+          width="1200"
+          height="1800"
+          alt="ASCENT Nexus v3.0.0 Crystal Wire infographic: parse law, SkyPulse PATHHINT, dual-mode Starlink usable-goodput, Wire Lab 3.0, agents, multimodal, ASCENT-D"
+          loading="lazy"
+          decoding="async"
+          style="width:100%;height:auto;border-radius:8px;border:1px solid var(--border);display:block"
+        >
+      </a>
+      <div class="cta-row" style="margin-top:0.85rem;margin-bottom:0">
+        <a class="btn btn-sm btn-primary" href="/infographic.png?v=3.0.0" download="ascent-nexus-infographic-v3.0.0.png">Download PNG</a>
+        <a class="btn btn-sm btn-ghost" href="/infographic.jpg?v=3.0.0" download="ascent-nexus-infographic-v3.0.0.jpg">Download JPG</a>
+        <a class="btn btn-sm btn-ghost" href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/docs/ascent-infographic.png" rel="noopener">On GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="tour">
+    <div class="sec-label">Onboarding</div>
+    <h2>From zero to agent + media in two minutes.</h2>
+    <p class="lede">A short guided path. Each step loads a real stream into the lab.</p>
+    <div class="panel">
+      <div class="tour-steps" id="tour-steps" role="tablist" aria-label="Tour steps"></div>
+      <div class="tour-body" id="tour-body"></div>
+      <div class="cta-row" style="margin:0">
+        <button type="button" class="btn btn-sm btn-primary" id="tour-next">Next step</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="tour-run">Load into Lab</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="tour-reset">Restart tour</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="lab">
+    <div class="sec-label">Wire Lab 3.0</div>
+    <h2>Prose and hex, one living stream.</h2>
+    <p class="lede">Dual synchronized editors, color-coded byte map, mission HUD for captain-log streams, agent and multimodal composers, <strong>SkyPulse PATHHINT</strong> (usable session bandwidth, not RF Mbps), ASCENT-D noise simulator, and a plane dashboard. Faithful to the draft SPEC packing (Cont <code>0xA0-0xBF</code>, frozen ASCENT-V). Press <kbd>Ctrl</kbd>+<kbd>K</kbd> for the command palette.</p>
+
+    <div class="lab-toolbar" id="lab-toolbar">
+      <div class="lab-toolbar-left">
+        <span class="panel-title" style="margin:0">Gallery</span>
+        <div class="chip-row" id="gallery-chips"></div>
+      </div>
+      <div class="lab-toolbar-right">
+        <div class="lab-tools">
+          <label class="chk"><input type="checkbox" id="opt-live" checked> Live sync</label>
+          <label class="chk"><input type="checkbox" id="opt-focus"> Focus lab</label>
+          <label class="chk"><input type="checkbox" id="opt-compact"> Compact</label>
+        </div>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-copy-hex">Copy hex</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-download">Download .bin</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-share">Share state</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-json">JSON units</button>
+      </div>
+    </div>
+
+    <div class="dash-grid" id="lab-dashboard" aria-live="polite"></div>
+    <div class="plane-usage" id="plane-usage"></div>
+
+    <div class="mission-hud" id="mission-hud" hidden>
+      <div class="mission-hud-top">
+        <div>
+          <div class="mission-kicker">Mission deck · live stream</div>
+          <div class="mission-title" id="mission-title">Approach vector locked</div>
+        </div>
+        <div class="mission-kicker" id="mission-meta">sim</div>
+      </div>
+      <div class="mission-grid" id="mission-grid"></div>
+    </div>
+
+    <div class="stream-timeline" id="stream-timeline" aria-label="Decoded unit timeline"></div>
+
+    <div class="lab-io grid-2" style="margin:1rem 0" id="lab-editors">
+      <div class="panel" id="panel-text">
+        <div class="panel-head">
+          <div class="panel-title">Text / prose</div>
+          <div class="cta-row" style="margin:0">
+            <button type="button" class="btn btn-sm btn-primary" id="btn-encode">Encode</button>
+            <button type="button" class="btn btn-sm btn-ghost" id="btn-encode-decode">Encode + view</button>
+          </div>
+        </div>
+        <textarea class="text-input" id="text-input" spellcheck="false" aria-label="Plain text to encode as ASCENT" placeholder="Type prose here. Pure ASCII is ASCENT-7 bit-identical."></textarea>
+        <div class="encode-opts">
+          <label class="chk"><input type="checkbox" id="opt-header" checked> Prefix <code>ASCENT/1.0</code></label>
+          <label class="chk"><input type="checkbox" id="opt-role"> Attach ROLE
+            <input type="text" id="opt-role-name" class="role-name" value="guide" maxlength="32" spellcheck="false" aria-label="ROLE name">
+          </label>
+          <label class="chk">Non-ASCII
+            <select id="opt-nonascii" aria-label="Non-ASCII encode mode">
+              <option value="v" selected>ASCENT-V (frozen)</option>
+              <option value="bridge">UTF-8 bridge (MM INLINE)</option>
+              <option value="reject">ASCENT-7 only (reject)</option>
+            </select>
+          </label>
+        </div>
+        <p class="decode-status" id="encode-status" role="status" aria-live="polite">Live sync on. Type to encode, or pick a gallery sample.</p>
+      </div>
+
+      <div class="panel" id="panel-hex">
+        <div class="panel-head">
+          <div class="panel-title">Hex stream</div>
+          <div class="cta-row" style="margin:0">
+            <button type="button" class="btn btn-sm btn-primary" id="btn-decode">Decode</button>
+          </div>
+        </div>
+        <textarea class="hex-input" id="hex-input" spellcheck="false" aria-label="ASCENT hex stream" placeholder="Paste ASCENT hex here"></textarea>
+        <div class="wire-stats" id="wire-stats"></div>
+        <p class="decode-status" id="decode-status" role="status" aria-live="polite">Waiting for stream.</p>
+      </div>
+    </div>
+
+    <div class="composer-grid" id="composers">
+      <div class="panel" id="agent-composer">
+        <div class="panel-title">Agent frame composer · P5</div>
+        <p class="form-hint">Build a fenced token <code>0x9A ... 0x9B</code> and insert it live.</p>
+        <div class="form-row">
+          <label for="agent-opcode">Opcode</label>
+          <select id="agent-opcode">
+            <option value="ROLE">ROLE</option>
+            <option value="TOOL">TOOL</option>
+            <option value="THINK">THINK</option>
+            <option value="HANDOFF">HANDOFF</option>
+            <option value="CAP">CAP</option>
+            <option value="SAFETY">SAFETY</option>
+            <option value="STOP">STOP</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="agent-name">Name / args</label>
+          <input type="text" id="agent-name" value="guide" spellcheck="false" aria-label="Agent name or payload">
+        </div>
+        <div class="form-row">
+          <label for="agent-flags">Flags</label>
+          <input type="number" id="agent-flags" value="0" min="0" max="255" aria-label="Agent flags">
+        </div>
+        <div class="cta-row" style="margin:0.4rem 0 0">
+          <button type="button" class="btn btn-sm btn-primary" id="btn-agent-insert">Insert into stream</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="btn-agent-replace">Replace stream</button>
+        </div>
+      </div>
+
+      <div class="panel" id="mm-composer">
+        <div class="panel-title">Multimodal playground · P6</div>
+        <p class="form-hint">REF (content-addressed), INLINE, or CHUNK units.</p>
+        <div class="form-row">
+          <label for="mm-kind">Kind</label>
+          <select id="mm-kind">
+            <option value="REF">REF</option>
+            <option value="INLINE" selected>INLINE</option>
+            <option value="CHUNK">CHUNK</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="mm-body">Body / ref</label>
+          <input type="text" id="mm-body" value="cid:sha256:aabbccddeeff00112233445566778899" spellcheck="false">
+        </div>
+        <div class="form-row">
+          <label for="mm-codec">Codec</label>
+          <input type="text" id="mm-codec" value="1" aria-label="Codec u16">
+        </div>
+        <div class="cta-row" style="margin:0.4rem 0 0">
+          <button type="button" class="btn btn-sm btn-primary" id="btn-mm-insert">Insert into stream</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="btn-mm-replace">Replace stream</button>
+        </div>
+      </div>
+
+      <div class="panel" id="aegir-composer">
+        <div class="panel-title">AEGIR sketch · P7</div>
+        <p class="form-hint">Lab envelope shape only. Registry of hybrid PQ algorithms for education.</p>
+        <div class="form-row">
+          <label for="aegir-pt">Plaintext</label>
+          <input type="text" id="aegir-pt" value="Hello, Universe." spellcheck="false">
+        </div>
+        <div class="form-row">
+          <label for="aegir-pass">Passphrase</label>
+          <input type="text" id="aegir-pass" value="lab" spellcheck="false">
+        </div>
+        <div class="cta-row" style="margin:0.4rem 0 0">
+          <button type="button" class="btn btn-sm btn-primary" id="btn-aegir-seal">Seal + insert</button>
+        </div>
+        <div id="aegir-registry" class="form-hint" style="margin-top:0.55rem"></div>
+        <p class="status-line" id="aegir-status"></p>
+      </div>
+    </div>
+
+    <div class="panel" id="skypulse" style="margin-bottom:1rem">
+      <div class="panel-title">SkyPulse PATHHINT · P2 0xC5 · sim</div>
+      <p class="form-hint">
+        LEO path foresight for <strong>usable session bandwidth</strong> and session continuity.
+        <code>next_capacity</code> is <strong>predicted bottleneck bits/s as seen by the sender</strong>, not RF PHY.
+        Encode a sample, inspect fields, toggle <strong>ASCENT-E-LEO</strong>
+        (light CRC or short RS, never stacked; no full P9 on interactive Starlink IP)
+        vs <strong>ASCENT-D</strong> (full RS(255,223) P9 for spool/deep-space/high-BER).
+        <em>Does not increase Starlink physical RF Mbps.</em> CRC/short-RS fail, stale TTL, or unknown version = erase (fail-closed).
+        This panel is <strong>sim</strong>.
+      </p>
+      <div class="form-row">
+        <label for="sky-path-id">path_id</label>
+        <input type="number" id="sky-path-id" value="66" min="0" style="max-width:6rem">
+        <label for="sky-cap">next_capacity (sender bottleneck bps)</label>
+        <input type="number" id="sky-cap" value="50000000" min="0" style="max-width:9rem">
+        <label for="sky-freeze">freeze_ms</label>
+        <input type="number" id="sky-freeze" value="15000" min="0" style="max-width:6rem">
+      </div>
+      <div class="form-row">
+        <label for="sky-conf">confidence</label>
+        <input type="number" id="sky-conf" value="0.8" min="0" max="1" step="0.05" style="max-width:5rem">
+        <label for="sky-ttl">ttl_ms</label>
+        <input type="number" id="sky-ttl" value="30000" min="0" style="max-width:6rem">
+        <label for="sky-obst">obstruction</label>
+        <input type="number" id="sky-obst" value="0.2" min="0" max="1" step="0.05" style="max-width:5rem">
+        <label for="sky-elev">elev_deg</label>
+        <input type="number" id="sky-elev" value="42" min="-90" max="90" step="0.5" style="max-width:5rem">
+      </div>
+      <div class="form-row">
+        <label for="sky-profile">Integrity</label>
+        <select id="sky-profile" aria-label="LEO-IP vs D integrity">
+          <option value="ASCENT-E-LEO" selected>ASCENT-E-LEO (Starlink IP/QUIC, light CRC or short RS, no full P9)</option>
+          <option value="ASCENT-D">ASCENT-D (full RS(255,223) P9, spool / deep-space / high-BER)</option>
+          <option value="ASCENT-E">ASCENT-E (plain unit)</option>
+        </select>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-sky-encode">Encode sample</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-sky-insert">Insert into stream</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-sky-canonical">Load golden</button>
+      </div>
+      <p class="status-line" id="sky-status" role="status">PATHHINT is a usable-session-bandwidth / CCA hint (sim). Not an RF speed claim.</p>
+      <pre class="hex-dump" id="sky-fields" style="max-height:160px">Fields appear after encode.</pre>
+    </div>
+
+    <div class="panel" id="dsim-panel" style="margin-bottom:1rem">
+      <div class="panel-title">ASCENT-D deep-space simulator · P9</div>
+      <p class="form-hint">Wrap the current unit in an outer frame (<code>D5 E5 C0 DE</code> + profile + ECC params + length + unit + RS codewords). Inject bit errors. Parity fail = erase unit (no mojibake). Browser lab uses real <strong>RS(255,223)</strong> GF(256) matching <code>ref/ascent_d.py</code> / reedsolo (1-byte recovery verified; multi-byte may erase).</p>
+      <div class="form-row">
+        <label for="dsim-errors">Bit flips</label>
+        <input type="number" id="dsim-errors" value="3" min="0" max="64" style="max-width:5rem">
+        <select id="dsim-target" aria-label="Error target region">
+          <option value="unit">Clear unit region</option>
+          <option value="parity">Parity / codewords</option>
+          <option value="anywhere">Anywhere in frame</option>
+        </select>
+        <button type="button" class="btn btn-sm btn-amber" id="btn-dsim-wrap">Wrap current stream</button>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-dsim-noise">Inject noise</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-dsim-decode">Decode outer frame</button>
+      </div>
+      <div class="noise-bar"><div class="noise-fill" id="noise-fill"></div></div>
+      <div class="dsim-viz">
+        <div class="dsim-box" id="dsim-tx">
+          <div class="panel-title">TX frame</div>
+          <pre class="hex-dump" id="dsim-tx-dump" style="max-height:140px">Wrap a stream to begin.</pre>
+        </div>
+        <div class="dsim-mid">
+          <span>channel</span>
+          <span id="dsim-flip-count">0 flips</span>
+          <span aria-hidden="true">~&gt;</span>
+        </div>
+        <div class="dsim-box" id="dsim-rx">
+          <div class="panel-title">RX status</div>
+          <pre class="hex-dump" id="dsim-rx-dump" style="max-height:140px">-</pre>
+        </div>
+      </div>
+      <p class="status-line" id="dsim-status" role="status"></p>
+    </div>
+
+    <div class="grid-2" id="lab-results">
+      <div class="panel">
+        <div class="panel-title">Byte map · click a cell</div>
+        <div class="byte-grid" id="byte-grid" aria-label="Byte grid"></div>
+        <div class="byte-inspect" id="byte-inspect">Click a byte to inspect plane, length, and meaning.</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Hex dump</div>
+        <pre class="hex-dump" id="hex-dump"></pre>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:1rem" id="lab-units">
+      <div class="panel-title">Decoded units</div>
+      <div class="event-stream" id="event-stream"></div>
+    </div>
+
+    <div class="panel" style="margin-top:1rem" id="conformance">
+      <div class="panel-title">Conformance · current stream</div>
+      <ul class="conf-list" id="conf-list"></ul>
+    </div>
+  </section>
+
+  <section id="architecture">
+    <div class="sec-label">Architecture explorer</div>
+    <h2>Eleven planes. One eternal law.</h2>
+    <p class="lede">Click a plane for detail. Planes present in the current lab stream glow teal. Private planes cannot redefine P0-P2.</p>
+    <div class="anatomy" id="stream-anatomy" aria-label="Stream anatomy">
+      <span class="anatomy-seg" data-seg="fixed">fixed control</span>
+      <span class="anatomy-arrow">-&gt;</span>
+      <span class="anatomy-seg" data-seg="len">length-prefixed frames</span>
+      <span class="anatomy-arrow">-&gt;</span>
+      <span class="anatomy-seg" data-seg="var">variable data</span>
+      <span class="anatomy-arrow">-&gt;</span>
+      <span class="anatomy-seg" data-seg="outer">optional P9 outer ECC</span>
+    </div>
+    <div class="planes" id="plane-grid"></div>
+    <div class="panel plane-detail" id="plane-detail">
+      <div class="panel-title" id="plane-detail-title">Plane</div>
+      <p class="lede" id="plane-detail-body" style="margin-bottom:0.75rem"></p>
+      <button type="button" class="btn btn-sm btn-primary" id="plane-load-example">Load example into Lab</button>
+    </div>
+  </section>
+
+  <section id="spec">
+    <div class="sec-label">Living SPEC</div>
+    <h2>Normative ideas you can try.</h2>
+    <p class="lede">Key sections of the draft SPEC, with "Try this" actions that load examples into the Wire Lab. Full text lives on GitHub.</p>
+    <div class="spec-toc" id="spec-toc"></div>
+    <div class="panel">
+      <div class="spec-panel" id="spec-panel"></div>
+      <div class="cta-row" style="margin-top:0.85rem">
+        <button type="button" class="btn btn-sm btn-primary" id="spec-try">Try this in Lab</button>
+        <a class="btn btn-sm btn-ghost" href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/SPEC.md" rel="noopener">Open full SPEC.md</a>
+        <a class="btn btn-sm btn-ghost" href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/ABSTRACT.md" rel="noopener">ABSTRACT.md</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="sec-label">Install</div>
+    <h2>Use the codec, not only the lab.</h2>
+    <p class="lede">SPEC <strong>1.0.0-rc1</strong> is frozen for implementers. <strong>ascent-wire 2.1.0</strong> is published on <strong>PyPI</strong> (Python) and <strong>npm</strong> (JavaScript). Nexus UI is <strong>3.0.0 Crystal Wire</strong>.</p>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">Python (PyPI)</div>
+        <pre class="code-block">pip install -U ascent-wire
+ascent self-test
+ascent version
+ascent encode --header --role guide "Hello, Universe."</pre>
+        <div class="cta-row" style="margin-top:0.65rem;margin-bottom:0">
+          <a class="btn btn-sm btn-primary" href="https://pypi.org/project/ascent-wire/" rel="noopener">PyPI</a>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">JavaScript (npm)</div>
+        <pre class="code-block">npm install ascent-wire
+// const { AscentCodec } = require("ascent-wire")</pre>
+        <div class="cta-row" style="margin-top:0.65rem;margin-bottom:0">
+          <a class="btn btn-sm btn-primary" href="https://www.npmjs.com/package/ascent-wire" rel="noopener">npm</a>
+          <a class="btn btn-sm btn-ghost" href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/INSTALL.md" rel="noopener">INSTALL.md</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="resilience">
+    <div class="sec-label">Resilience</div>
+    <h2>Usable session bandwidth, not RF slogans.</h2>
+    <p class="lede">Dual-mode plan so a terminal stays useful when your fiber dies. Starlink is last-mile IP. ASCENT is the wire. SkyPulse PATHHINT is foresight for CCA/apps (growth freeze, seed predicted sender bottleneck). Grok is cloud compute. When the API is gone, edge models take over. ASCENT does not make Starlink faster at RF. Not a bare bandwidth upgrade.</p>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">Modes</div>
+        <pre class="code-block">CLOUD  - api.x.ai reachable, path stable
+EDGE   - local OpenAI-compatible model
+QUEUE  - obstruction / RTT flap / store-forward
+DEAD   - honest fail (no power / no model)
+
+SkyPulse PATHHINT: bottleneck_hint + freeze_until (usable session bandwidth, not RF)
+ASCENT-E-LEO: light CRC or short RS, no full P9 on interactive IP
+ASCENT-D: full RS(255,223) P9 for spool / deep-space / high-BER only</pre>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Docs + skeleton</div>
+        <p class="lede" style="margin:0 0 0.75rem">Full design package, kill criteria, and Phase 0-3 roadmap. Phase 1 client skeleton lives in the public repo.</p>
+        <div class="cta-row" style="margin-bottom:0">
+          <a class="btn btn-sm btn-primary" href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/docs/GROK-ASCENT-STARLINK-ARCHITECTURE.md" rel="noopener">Architecture package</a>
+          <a class="btn btn-sm btn-ghost" href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/docs/SKYPULSE.md" rel="noopener">SkyPulse</a>
+          <a class="btn btn-sm btn-ghost" href="https://github.com/Pitchfork-and-Torch/ascent/tree/main/examples/ascent_starlink_client" rel="noopener">Client skeleton</a>
+          <a class="btn btn-sm btn-ghost" href="/og.jpg?v=3.0.0" rel="noopener">Tweet card</a>
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:1rem">
+      <div class="panel-title">Interface map · horizontal</div>
+      <a href="/ascent-starlink-interface.png?v=2.0.3" target="_blank" rel="noopener">
+        <img
+          src="/ascent-starlink-interface-1200.jpg?v=2.0.3"
+          width="1200"
+          height="550"
+          style="width:100%;height:auto;border-radius:12px;display:block"
+          alt="ASCENT x Starlink horizontal interface map: terminal, wire, TLS, IP, dish, egress, brain"
+        >
+      </a>
+      <div class="cta-row" style="margin-top:0.65rem;margin-bottom:0">
+        <a class="btn btn-sm btn-primary" href="/ascent-starlink-interface.png?v=2.0.3" download="ascent-starlink-interface-v2.0.3.png">Download PNG 2400x1100</a>
+        <a class="btn btn-sm btn-ghost" href="/ascent-starlink-interface.jpg?v=2.0.3" download="ascent-starlink-interface-v2.0.3.jpg">Download JPG</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="codegen">
+    <div class="sec-label">Adoption</div>
+    <h2>Snippets that match the lab stream.</h2>
+    <p class="lede">Minimal encode/decode helpers. Prefer ASCENT-7 when every codepoint is <code>U+0000..007F</code>.</p>
+    <div class="panel">
+      <div class="codegen-tabs" id="codegen-tabs">
+        <button type="button" class="chip active" data-lang="python">Python</button>
+        <button type="button" class="chip" data-lang="javascript">JavaScript</button>
+        <button type="button" class="chip" data-lang="rust">Rust</button>
+        <button type="button" class="chip" data-lang="agent">Agent loop</button>
+      </div>
+      <pre class="code-block" id="codegen-out" aria-live="polite"></pre>
+      <div class="cta-row" style="margin-top:0.65rem">
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-copy-code">Copy snippet</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="meta">
+    <div class="sec-label">Self-reference</div>
+    <h2>The page, as a stream.</h2>
+    <p class="lede">Encode a manifesto fragment as ASCENT to reinforce the self-describing nature of the standard.</p>
+    <div class="panel">
+      <div class="cta-row" style="margin:0">
+        <button type="button" class="btn btn-sm btn-primary" id="btn-encode-manifesto">Encode manifesto into Lab</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="btn-encode-page-title">Encode page title</button>
+      </div>
+      <p class="status-line" id="meta-status" style="margin-top:0.65rem"></p>
+    </div>
+  </section>
+
+  <section id="about">
+    <div class="sec-label">Relation to the standard</div>
+    <h2>Nexus is the face. The repo is the law.</h2>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">What this site is</div>
+        <p class="lede" style="margin:0">
+          ASCENT Nexus Wire Lab 3.0 Crystal Wire is a client-side educational instrument for the draft ASCENT wire standard.
+          The frozen packing (Cont <code>0xA0-0xBF</code>, ASCENT-V short forms, agent/MM frames) tracks
+          <code>ref/ascent_codec.py</code> and the public SPEC. Deep-space demos use a browser-friendly
+          real RS(255,223) in-browser (matches <code>ref/ascent_d.py</code>).
+        </p>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Integrate back</div>
+        <table class="simple">
+          <tbody>
+            <tr><td><a href="https://github.com/Pitchfork-and-Torch/ascent">GitHub repo</a></td><td>Normative home</td></tr>
+            <tr><td><a href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/SPEC.md">SPEC.md</a></td><td>A-F draft</td></tr>
+            <tr><td><a href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/ref/ascent_codec.py">ascent_codec.py</a></td><td>Python reference</td></tr>
+            <tr><td><a href="https://github.com/Pitchfork-and-Torch/ascent/blob/main/examples/hello-universe.ascent.bin">hello-universe.ascent.bin</a></td><td>132-byte sample</td></tr>
+            <tr><td>site/public/</td><td>This Nexus UI</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="note-box">
+      <strong>Ship note.</strong> Original live site spirit preserved: manifesto voice, sacred meter, Hello Universe,
+      @suddenlyjon credit, MIT. Crystal Wire adds command palette, mission HUD, stream timeline, density, Fontshare, and 44px rails.
+      Deploy from <code>site/public</code> via Cloudflare Pages / static host. Keep JS codec in lockstep with Python golden tests.
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="sec-label">FAQ</div>
+    <h2>Short answers you can cite.</h2>
+    <div class="faq-list">
+      <details class="faq-item" open>
+        <summary>What is ASCENT?</summary>
+        <p>ASCENT (ASCII Successor with Compatible Encoding of Named Text) is a wire encoding and control grammar that keeps classic 7-bit ASCII bit-identical on bytes 0-127 forever, then adds agent frames, multimodal refs, quantum-safe control, and a deep-space ECC profile.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Does ASCENT break existing ASCII files?</summary>
+        <p>No. Pure classic ASCII files are valid ASCENT-7. Any byte less than 0x80 is classic ASCII, width 1, forever. Greppers, shebangs, and SMTP 7-bit paths remain correct on that subset.</p>
+      </details>
+      <details class="faq-item">
+        <summary>What is Wire Lab 3.0 Crystal Wire?</summary>
+        <p>The interactive public face of ASCENT. Dual editors, SkyPulse PATHHINT, agent and multimodal composers, ASCENT-D erase-on-fail, AEGIR sketch, eleven-plane explorer, command palette, mission HUD, and shareable hex URLs.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Does SkyPulse make Starlink faster at RF?</summary>
+        <p>No. PATHHINT is a fail-closed usable-session-bandwidth / CCA hint. It does not raise physical RF Mbps. ASCENT-E-LEO uses light integrity on interactive IP. ASCENT-D is for spool and deep space.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Which version should I cite?</summary>
+        <p>Three surfaces, on purpose: SPEC <strong>1.0.0-rc1</strong> is the wire law. Nexus / architecture card is <strong>3.0.0 Crystal Wire</strong> (UI). Packages <strong>ascent-wire 2.1.0</strong> are published on PyPI and npm. A UI card bump does not move the codec or thaw the RC freeze.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Does ASCENT unlock OrbitStack dual-gate?</summary>
+        <p>No. PATHHINT is an open fail-closed hint. Dual-gate remains a paid OrbitStack product fence. This lab does not implement, enable, or claim dual-gate wins.</p>
+      </details>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-row">
+      <div>
+        <strong style="color:var(--text)">ASCENT Nexus</strong> · Wire Lab 3.0 Crystal Wire<br>
+        ASCII Successor with Compatible Encoding of Named Text · MIT · Pitchfork and Torch<br>
+        SPEC <strong style="color:var(--text)">v1.0.0-rc1</strong> · Nexus / architecture card <strong style="color:var(--text)">v3.0.0</strong> · ascent-wire <strong style="color:var(--text)">2.1.0</strong>
+      </div>
+      <div>
+        <a href="https://x.com/suddenlyjon" target="_blank" rel="noopener noreferrer">@suddenlyjon</a> ·
+        <a href="https://github.com/Pitchfork-and-Torch/ascent">GitHub</a> ·
+        <a href="/llms.txt">llms.txt</a> ·
+        <a href="/infographic.png?v=3.0.0">Infographic</a>
+      </div>
+    </div>
+    <p style="margin-top:1rem">Keep every classic ASCII byte sacred. Ascend the rest without burning the stairs.</p>
+  </footer>
+</main>
+
+<div class="cmdk-backdrop" id="cmdk" data-open="false" hidden>
+  <div class="cmdk" role="dialog" aria-modal="true" aria-labelledby="cmdk-label">
+    <div id="cmdk-label" class="visually-hidden" style="position:absolute;left:-9999px">Command palette</div>
+    <input class="cmdk-input" id="cmdk-input" type="search" placeholder="Jump, load a sample, or run an action..." autocomplete="off" spellcheck="false">
+    <div class="cmdk-list" id="cmdk-list" role="listbox"></div>
+  </div>
+</div>
+<div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+<script src="ascent_codec.js"></script>
+<script src="ascent_rs.js"></script>
+<script src="ascent_d_lab.js"></script>
+<script src="app.js?v=3.0.0" defer></script>
+<script defer src="https://hits.jonbailey.xyz/c.js" data-site="ascent"></script>
+</body>
+</html>
