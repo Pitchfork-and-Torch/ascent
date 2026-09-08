@@ -1,0 +1,29 @@
+﻿{
+  "name": "ascent-wire",
+  "version": "2.1.0",
+  "description": "ASCENT wire codec (browser/Node) - frozen Cont packing, agent/MM frames, SkyPulse PATHHINT, RS(255,223) ASCENT-D lab. Pitchfork-and-Torch.",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "ascent_codec.js",
+    "ascent_rs.js",
+    "ascent_d_lab.js",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Pitchfork-and-Torch/ascent.git",
+    "directory": "packages/ascent-js"
+  },
+  "homepage": "https://ascent.jonbailey.xyz/",
+  "keywords": ["ascent", "ascii", "encoding", "agents", "wire", "ecc", "pitchfork"],
+  "scripts": {
+    "test": "node ../../tests/run_js_lock.js",
+    "sync-from-site": "node scripts/sync-from-site.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
