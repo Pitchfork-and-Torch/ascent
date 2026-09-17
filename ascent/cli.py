@@ -125,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
                 elif kind == "multimodal":
                     print(
                         "MM:",
-                        ev.get("kindName"),
+                        ev.get("kind_name") or ev.get("kindName") or ev.get("mm_kind"),
                         ev.get("ref") or ev.get("text") or "",
                     )
                 elif kind == "pathhint":
