@@ -410,7 +410,8 @@ def unescape_agent_args(raw: bytes) -> bytes:
 
 def parse_role_or_name(args: bytes) -> dict:
     if not args:
-        return {"name": "", "rest": b""}
+        # Same key set as the populated branch; raw bytes here broke json.dumps.
+        return {"name": "", "name_bytes": "", "rest_hex": ""}
     n = args[0]
     if 1 + n > len(args):
         raise AscentCodecError("name_len exceeds args")

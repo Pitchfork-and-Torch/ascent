@@ -4,8 +4,36 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
+
+
+def _hex_to_bytes(raw: str) -> bytes:
+    """Parse a hex string; tolerate whitespace, newlines and 0x prefixes."""
+    clean = "".join(raw.split()).replace("0x", "").replace("0X", "")
+    return bytes.fromhex(clean)
+
+
+def _read_decode_input(raw: str | None, force_file: bool) -> bytes:
+    """Resolve `ascent decode` input to wire bytes: a file path or a hex string.
+
+    File detection uses os.path.isfile, which returns False on any OSError.
+    pathlib.Path.is_file re-raises ENAMETOOLONG on Python < 3.13, so a hex
+    string longer than NAME_MAX (255 chars, i.e. any stream over 127 bytes,
+    including the Hello, Universe sample) used to crash the CLI.
+    """
+    if raw is None:
+        raw = sys.stdin.read()
+    raw = raw.strip()
+    if force_file:
+        return Path(raw).read_bytes()
+    if raw and os.path.isfile(raw):
+        return Path(raw).read_bytes()
+    try:
+        return _hex_to_bytes(raw)
+    except ValueError:
+        raise ValueError("input is neither an existing file nor a hex string") from None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -99,14 +127,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "decode":
-        raw = args.input
-        if raw is None:
-            raw = sys.stdin.read().strip()
-        if args.file or (raw and Path(raw).is_file()):
-            data = Path(raw).read_bytes()
-        else:
-            clean = raw.replace(" ", "").replace("\n", "").replace("0x", "")
-            data = bytes.fromhex(clean)
+        try:
+            data = _read_decode_input(args.input, args.file)
+        except (OSError, ValueError) as exc:
+            print(f"ascent decode: {exc}", file=sys.stderr)
+            return 2
         events = decode_stream(data)
         if args.json:
             print(json.dumps(events_to_jsonable(events), indent=2))
@@ -143,8 +168,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "pathhint":
         pol = recommend_integrity(args.profile) if recommend_integrity else {}
         if args.decode:
-            clean = args.decode.replace(" ", "").replace("\n", "").replace("0x", "")
-            events = decode_stream(bytes.fromhex(clean))
+            events = decode_stream(_hex_to_bytes(args.decode))
             print(json.dumps(events_to_jsonable(events), indent=2))
             return 0
         use_crc = args.crc or (pol.get("use_pathhint_crc") if pol else False)
