@@ -280,7 +280,13 @@ def decode_ascent_v_at(
 def _encode_role_frame(role: str) -> bytes:
     if not role or not isinstance(role, str):
         raise AscentCodecError("role must be a non-empty ASCII name")
-    name = role.encode("ascii")
+    # Non-ASCII used to raise UnicodeEncodeError and crash `ascent encode --role`.
+    if not role.isascii() or not role.isprintable() or any(ch.isspace() for ch in role):
+        raise AscentCodecError("role must be a non-empty ASCII name")
+    try:
+        name = role.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise AscentCodecError("role must be a non-empty ASCII name") from exc
     if len(name) > 64:
         raise AscentCodecError("ROLE name too long (max 64)")
     # 9A C1 ver=1 opcode=ROLE=2 flags=0 len name_len+name 9B
