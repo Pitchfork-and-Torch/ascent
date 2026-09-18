@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import struct
 import zlib
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -846,8 +847,20 @@ def encode_pathhint(
         raise AscentCodecError("confidence must be in [0, 1]")
     # Apply freeze_until_ms alias before range checks. Previously a negative
     # freeze_until_ms bypassed the >=0 guard and raised raw struct.error on pack.
+    # Non-finite freeze_ms/ttl_ms/freeze_until_ms used to reach int()/struct.pack
+    # as ValueError instead of AscentCodecError.
+    def _finite_ms(name: str, val) -> int:
+        if isinstance(val, bool) or not isinstance(val, (int, float)):
+            raise AscentCodecError(f"{name} must be a finite int >= 0")
+        if isinstance(val, float) and not math.isfinite(val):
+            raise AscentCodecError(f"{name} must be a finite int >= 0")
+        return int(val)
+
     if freeze_until_ms is not None and freeze_ms == 0:
-        freeze_ms = int(freeze_until_ms)
+        freeze_ms = _finite_ms("freeze_until_ms", freeze_until_ms)
+    else:
+        freeze_ms = _finite_ms("freeze_ms", freeze_ms)
+    ttl_ms = _finite_ms("ttl_ms", ttl_ms)
     if freeze_ms < 0 or ttl_ms < 0:
         raise AscentCodecError("freeze_ms and ttl_ms must be >= 0")
     if freeze_ms > 0xFFFFFFFF or ttl_ms > 0xFFFFFFFF:
