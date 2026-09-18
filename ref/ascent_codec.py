@@ -844,10 +844,12 @@ def encode_pathhint(
         raise AscentCodecError("path_id out of u64 range")
     if not (0.0 <= confidence <= 1.0):
         raise AscentCodecError("confidence must be in [0, 1]")
-    if freeze_ms < 0 or ttl_ms < 0:
-        raise AscentCodecError("freeze_ms and ttl_ms must be >= 0")
+    # Apply freeze_until_ms alias before range checks. Previously a negative
+    # freeze_until_ms bypassed the >=0 guard and raised raw struct.error on pack.
     if freeze_until_ms is not None and freeze_ms == 0:
         freeze_ms = int(freeze_until_ms)
+    if freeze_ms < 0 or ttl_ms < 0:
+        raise AscentCodecError("freeze_ms and ttl_ms must be >= 0")
     if freeze_ms > 0xFFFFFFFF or ttl_ms > 0xFFFFFFFF:
         raise AscentCodecError("freeze_ms/ttl_ms exceed u32")
 
