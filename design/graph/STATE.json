@@ -1,0 +1,31 @@
+{
+  "task": "next-ascii-successor",
+  "wave": 3,
+  "status": "complete",
+  "winner": {
+    "name": "ASCENT",
+    "expansion": "ASCII Successor with Compatible Encoding of Named Text",
+    "heritage_title": "American Standard Code for Extended Named Text"
+  },
+  "score": {
+    "round1": 94,
+    "round2_estimate": 97,
+    "pass": true
+  },
+  "budget": {
+    "wave1_inventors": 4,
+    "wave2_specialists": 4,
+    "eval_loops_max": 2,
+    "eval_loops_used": 1,
+    "polish_pass": 1
+  },
+  "final": ".\\SPEC.md",
+  "history": [
+    "wave1 fan-out invent A/B/C/D",
+    "wave1 fan-in name-judge -> ASCENT hybrid architecture",
+    "wave2 specialists planes/agents/deep-space/governance",
+    "synthesizer SPEC.md",
+    "evaluator 94 PASS",
+    "residual polish"
+  ]
+}
