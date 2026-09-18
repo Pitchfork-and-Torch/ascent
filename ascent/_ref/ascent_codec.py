@@ -846,6 +846,11 @@ def encode_pathhint(
         raise AscentCodecError("path_id must be an int in u64 range")
     if path_id < 0 or path_id > 0xFFFFFFFFFFFFFFFF:
         raise AscentCodecError("path_id out of u64 range")
+    # bool is a subclass of int: confidence=True used to encode as 1.0.
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        raise AscentCodecError("confidence must be a finite number in [0, 1]")
+    if isinstance(confidence, float) and not math.isfinite(confidence):
+        raise AscentCodecError("confidence must be a finite number in [0, 1]")
     if not (0.0 <= confidence <= 1.0):
         raise AscentCodecError("confidence must be in [0, 1]")
     # Apply freeze_until_ms alias before range checks. Previously a negative
