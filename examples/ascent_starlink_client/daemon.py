@@ -76,7 +76,10 @@ def make_pathhint(dish):
     elev = dish.elev_deg
     cap = _env_int("ASCENT_PATH_CAP_BPS", 50_000_000)
     freeze = _env_int("ASCENT_FREEZE_MS", 15_000)
-    conf = _env_float("ASCENT_PATH_CONFIDENCE", 0.5) or 0.5
+    # Do not use `or 0.5`: confidence 0.0 is valid and must not become 0.5.
+    conf = _env_float("ASCENT_PATH_CONFIDENCE", 0.5)
+    if conf is None:
+        conf = 0.5
     if obst is not None:
         conf = max(0.15, min(1.0, 1.0 - obst))
     ttl = _env_int("ASCENT_PATH_TTL_MS", 30_000)
