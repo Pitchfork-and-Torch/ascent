@@ -191,6 +191,14 @@ def main(argv: list[str] | None = None) -> int:
             except (ValueError, AscentCodecError) as exc:
                 print(f"ascent pathhint: {exc}", file=sys.stderr)
                 return 2
+            # pathhint --decode used to accept any ASCENT stream (e.g. Hello,
+            # Universe) and exit 0 with TEXT/AGENT events. Require a PATHHINT.
+            if not any(ev.get("kind") == "pathhint" for ev in events):
+                print(
+                    "ascent pathhint: no PATHHINT unit in input",
+                    file=sys.stderr,
+                )
+                return 2
             print(json.dumps(events_to_jsonable(events), indent=2))
             return 0
         use_crc = args.crc or (pol.get("use_pathhint_crc") if pol else False)
