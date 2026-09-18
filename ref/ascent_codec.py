@@ -841,6 +841,9 @@ def encode_pathhint(
     freeze_until_ms is supplied without freeze_ms, it is treated as a relative
     window (not Unix epoch) so goldens stay deterministic.
     """
+    # Non-int path_id used to reach struct.pack as a raw struct.error.
+    if isinstance(path_id, bool) or not isinstance(path_id, int):
+        raise AscentCodecError("path_id must be an int in u64 range")
     if path_id < 0 or path_id > 0xFFFFFFFFFFFFFFFF:
         raise AscentCodecError("path_id out of u64 range")
     if not (0.0 <= confidence <= 1.0):
@@ -870,16 +873,28 @@ def encode_pathhint(
     cap_kbps = 0
     if next_capacity_kbps is not None and next_capacity_bps is not None:
         raise AscentCodecError("pass next_capacity_bps or next_capacity_kbps, not both")
+
+    def _finite_cap(name: str, val) -> int:
+        # Non-finite next_capacity_* used to raise ValueError/OverflowError from
+        # int()/comparisons instead of AscentCodecError (same class as freeze/ttl).
+        if isinstance(val, bool) or not isinstance(val, (int, float)):
+            raise AscentCodecError(f"{name} must be a finite number in u32 range")
+        if isinstance(val, float) and not math.isfinite(val):
+            raise AscentCodecError(f"{name} must be a finite number in u32 range")
+        return int(val)
+
     if next_capacity_kbps is not None:
         flags |= FLAG_CAP_KBPS
-        cap_kbps = int(next_capacity_kbps)
+        cap_kbps = _finite_cap("next_capacity_kbps", next_capacity_kbps)
     elif next_capacity_bps is None:
         cap_kbps = 0
-    elif next_capacity_bps > 0xFFFFFFFF:
-        flags |= FLAG_CAP_KBPS
-        cap_kbps = (int(next_capacity_bps) + 999) // 1000
     else:
-        cap_kbps = int(next_capacity_bps)
+        bps = _finite_cap("next_capacity_bps", next_capacity_bps)
+        if bps > 0xFFFFFFFF:
+            flags |= FLAG_CAP_KBPS
+            cap_kbps = (bps + 999) // 1000
+        else:
+            cap_kbps = bps
     if cap_kbps < 0 or cap_kbps > 0xFFFFFFFF:
         raise AscentCodecError("next_capacity out of u32 range")
 
