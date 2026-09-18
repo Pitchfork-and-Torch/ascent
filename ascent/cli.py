@@ -22,14 +22,27 @@ def _read_decode_input(raw: str | None, force_file: bool) -> bytes:
     pathlib.Path.is_file re-raises ENAMETOOLONG on Python < 3.13, so a hex
     string longer than NAME_MAX (255 chars, i.e. any stream over 127 bytes,
     including the Hello, Universe sample) used to crash the CLI.
+
+    Empty/whitespace input used to parse as empty hex (`bytes.fromhex("")`)
+    and exit 0 with no events — reject it like pathhint --decode.
     """
     if raw is None:
         raw = sys.stdin.read()
     raw = raw.strip()
     if force_file:
-        return Path(raw).read_bytes()
-    if raw and os.path.isfile(raw):
-        return Path(raw).read_bytes()
+        if not raw:
+            raise ValueError("decode --file requires a path")
+        data = Path(raw).read_bytes()
+        if not data:
+            raise ValueError("decode input is empty")
+        return data
+    if not raw:
+        raise ValueError("decode requires a non-empty hex string or file path")
+    if os.path.isfile(raw):
+        data = Path(raw).read_bytes()
+        if not data:
+            raise ValueError("decode input is empty")
+        return data
     try:
         return _hex_to_bytes(raw)
     except ValueError:
