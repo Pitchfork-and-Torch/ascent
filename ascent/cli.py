@@ -102,11 +102,18 @@ def main(argv: list[str] | None = None) -> int:
         raw = args.input
         if raw is None:
             raw = sys.stdin.read().strip()
-        if args.file or (raw and Path(raw).is_file()):
-            data = Path(raw).read_bytes()
-        else:
-            clean = raw.replace(" ", "").replace("\n", "").replace("0x", "")
-            data = bytes.fromhex(clean)
+        try:
+            if args.file or (raw and Path(raw).is_file()):
+                data = Path(raw).read_bytes()
+            else:
+                clean = (raw or "").replace(" ", "").replace("\n", "").replace("0x", "")
+                data = bytes.fromhex(clean)
+        except ValueError as exc:
+            print(f"ascent decode: invalid hex input ({exc})", file=sys.stderr)
+            return 2
+        except OSError as exc:
+            print(f"ascent decode: cannot read input ({exc})", file=sys.stderr)
+            return 2
         events = decode_stream(data)
         if args.json:
             print(json.dumps(events_to_jsonable(events), indent=2))
@@ -143,8 +150,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "pathhint":
         pol = recommend_integrity(args.profile) if recommend_integrity else {}
         if args.decode:
-            clean = args.decode.replace(" ", "").replace("\n", "").replace("0x", "")
-            events = decode_stream(bytes.fromhex(clean))
+            try:
+                clean = args.decode.replace(" ", "").replace("\n", "").replace("0x", "")
+                data = bytes.fromhex(clean)
+            except ValueError as exc:
+                print(f"ascent pathhint: invalid hex input ({exc})", file=sys.stderr)
+                return 2
+            events = decode_stream(data)
             print(json.dumps(events_to_jsonable(events), indent=2))
             return 0
         use_crc = args.crc or (pol.get("use_pathhint_crc") if pol else False)
