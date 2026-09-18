@@ -1,0 +1,41 @@
+{
+  "comment": "ASCENT SkyPulse PATHHINT v1 goldens. Hex is lowercase. 50 Mbps is a goodput HINT, not an RF claim.",
+  "lead": "c5",
+  "schema_v1": "01",
+  "plain": {
+    "name": "canonical_pathhint_v1",
+    "hex": "c501001a0e000000000000004202faf08000003a981f40000075303301a4",
+    "len": 30,
+    "fields": {
+      "schema": 1,
+      "applied": true,
+      "path_id": 66,
+      "next_capacity_bps": 50000000,
+      "freeze_ms": 15000,
+      "confidence": 0.8,
+      "ttl_ms": 30000,
+      "obstruction": 0.2,
+      "elev_deg": 42.0,
+      "crc": false,
+      "flags": 14
+    }
+  },
+  "crc": {
+    "name": "canonical_pathhint_v1_crc",
+    "hex": "c501001e1e000000000000004202faf08000003a981f40000075303301a4d565b1f8",
+    "len": 34,
+    "fields": {
+      "schema": 1,
+      "applied": true,
+      "path_id": 66,
+      "next_capacity_bps": 50000000,
+      "crc": true,
+      "flags": 30
+    }
+  },
+  "unknown_schema": {
+    "hex": "c599000401020304",
+    "reason": "unknown_schema",
+    "applied": false
+  }
+}
