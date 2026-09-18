@@ -38,6 +38,7 @@ def _read_decode_input(raw: str | None, force_file: bool) -> bytes:
 
 def main(argv: list[str] | None = None) -> int:
     from ascent import (
+        AscentCodecError,
         __version__,
         canonical_pathhint_bytes,
         decode_stream,
@@ -114,12 +115,16 @@ def main(argv: list[str] | None = None) -> int:
         text = args.text
         if text is None:
             text = sys.stdin.read()
-        wire = encode_text(
-            text,
-            header=args.header,
-            role=args.role,
-            non_ascii=args.mode,
-        )
+        try:
+            wire = encode_text(
+                text,
+                header=args.header,
+                role=args.role,
+                non_ascii=args.mode,
+            )
+        except AscentCodecError as exc:
+            print(f"ascent encode: {exc}", file=sys.stderr)
+            return 2
         if args.bin:
             sys.stdout.buffer.write(wire)
         else:
@@ -132,7 +137,11 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError) as exc:
             print(f"ascent decode: {exc}", file=sys.stderr)
             return 2
-        events = decode_stream(data)
+        try:
+            events = decode_stream(data)
+        except AscentCodecError as exc:
+            print(f"ascent decode: {exc}", file=sys.stderr)
+            return 2
         if args.json:
             print(json.dumps(events_to_jsonable(events), indent=2))
         else:
@@ -168,20 +177,28 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "pathhint":
         pol = recommend_integrity(args.profile) if recommend_integrity else {}
         if args.decode:
-            events = decode_stream(_hex_to_bytes(args.decode))
+            try:
+                events = decode_stream(_hex_to_bytes(args.decode))
+            except (ValueError, AscentCodecError) as exc:
+                print(f"ascent pathhint: {exc}", file=sys.stderr)
+                return 2
             print(json.dumps(events_to_jsonable(events), indent=2))
             return 0
         use_crc = args.crc or (pol.get("use_pathhint_crc") if pol else False)
-        wire = encode_pathhint(
-            path_id=args.path_id,
-            next_capacity_bps=args.cap_bps,
-            freeze_ms=args.freeze_ms,
-            confidence=args.confidence,
-            ttl_ms=args.ttl_ms,
-            obstruction=args.obstruction,
-            elev_deg=args.elev,
-            crc=bool(use_crc),
-        )
+        try:
+            wire = encode_pathhint(
+                path_id=args.path_id,
+                next_capacity_bps=args.cap_bps,
+                freeze_ms=args.freeze_ms,
+                confidence=args.confidence,
+                ttl_ms=args.ttl_ms,
+                obstruction=args.obstruction,
+                elev_deg=args.elev,
+                crc=bool(use_crc),
+            )
+        except AscentCodecError as exc:
+            print(f"ascent pathhint: {exc}", file=sys.stderr)
+            return 2
         print(wire.hex().upper())
         if pol:
             print(
