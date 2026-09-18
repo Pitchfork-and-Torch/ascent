@@ -176,7 +176,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "pathhint":
         pol = recommend_integrity(args.profile) if recommend_integrity else {}
-        if args.decode:
+        # --decode present (including "") must not fall through to encode.
+        # Empty/whitespace hex used to be falsy and silently minted a PATHHINT.
+        if args.decode is not None:
+            cleaned = "".join(args.decode.split()).replace("0x", "").replace("0X", "")
+            if not cleaned:
+                print(
+                    "ascent pathhint: --decode requires a non-empty hex string",
+                    file=sys.stderr,
+                )
+                return 2
             try:
                 events = decode_stream(_hex_to_bytes(args.decode))
             except (ValueError, AscentCodecError) as exc:

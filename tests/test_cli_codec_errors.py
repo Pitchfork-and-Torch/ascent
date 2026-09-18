@@ -48,10 +48,34 @@ def test_pathhint_bad_confidence_clean() -> None:
     print("PASS test_pathhint_bad_confidence_clean")
 
 
+
+def test_pathhint_empty_decode_clean() -> None:
+    # `pathhint --decode ''` used to be falsy and fall through to encode.
+    rc, out, err = run(["pathhint", "--decode", ""])
+    assert rc == 2, (rc, out, err)
+    assert out == ""
+    assert err.startswith("ascent pathhint: "), err
+    assert "Traceback" not in err
+    # Must not mint a PATHHINT hex line on stdout.
+    assert not out.strip().startswith("C5"), out
+    print("PASS test_pathhint_empty_decode_clean")
+
+
+def test_pathhint_whitespace_decode_clean() -> None:
+    rc, out, err = run(["pathhint", "--decode", "   "])
+    assert rc == 2, (rc, out, err)
+    assert out == ""
+    assert err.startswith("ascent pathhint: "), err
+    assert "Traceback" not in err
+    print("PASS test_pathhint_whitespace_decode_clean")
+
+
 def main() -> int:
     test_encode_reject_non_ascii_clean()
     test_decode_truncated_agent_clean()
     test_pathhint_bad_confidence_clean()
+    test_pathhint_empty_decode_clean()
+    test_pathhint_whitespace_decode_clean()
     print("ALL CLI CODEC ERROR TESTS PASS")
     return 0
 
