@@ -1,0 +1,60 @@
+[
+  {
+    "name": "ascii_identity",
+    "text": "Hello, Universe.\n",
+    "header": false,
+    "mode": "reject",
+    "hex": "48656C6C6F2C20556E6976657273652E0A"
+  },
+  {
+    "name": "header_only_empty_body",
+    "text": "",
+    "header": true,
+    "mode": "reject",
+    "hex": "415343454E542F312E300A"
+  },
+  {
+    "name": "role_guide_after_hi",
+    "text": "hi\n",
+    "header": false,
+    "role": "guide",
+    "mode": "reject",
+    "hex": "68690A9AC10100020000060567756964659B"
+  },
+  {
+    "name": "hello_universe",
+    "product": true,
+    "hex": "415343454E542F312E300A48656C6C6F2C20556E6976657273652E0A9AC10100020000060567756964659B9D4D0100050101E491921182DA9CB7B24E4B8A579D5E78EDC23E40141D015FAA097C3ECC6D65EB000000000000002A6369643A7368613235363A61616262636364646565666630303131323233333434353536363737383839",
+    "expect_units": ["text", "agent", "multimodal"]
+  },
+  {
+    "name": "surrogate_reject",
+    "text": "\ud800",
+    "header": false,
+    "mode": "v",
+    "expect_error": "surrogate"
+  },
+  {
+    "name": "latin1_e_acute_v",
+    "text": "caf\u00e9",
+    "header": false,
+    "mode": "v",
+    "hex": "636166D3A9",
+    "roundtrip": true
+  },
+  {
+    "name": "rocket_emoji_v",
+    "text": "\ud83d\ude80",
+    "header": false,
+    "mode": "v",
+    "hex": "F3ADA0A0",
+    "roundtrip": true
+  },
+  {
+    "name": "bridge_cafe",
+    "text": "caf\u00e9",
+    "header": false,
+    "mode": "bridge",
+    "hex": "6361669D4D02000100000000000000000002C3A9"
+  }
+]
