@@ -1,0 +1,2062 @@
+/* ASCENT frozen wire codec (browser) - ports ref/ascent_codec.py
+   Cont 0xA0-0xBF (5 bits), ASCENT-V short forms + F5 03 u24be long.
+   ASCII hyphens only. No network I/O. */
+
+(function (global) {
+  "use strict";
+
+  var OPCODE = {
+    0x0001: "STOP",
+    0x0002: "ROLE",
+    0x0003: "TOOL",
+    0x0004: "THINK",
+    0x0005: "HANDOFF",
+    0x0006: "CAP",
+    0x0007: "SAFETY",
+  };
+  var MM_KIND = { 1: "REF", 2: "INLINE", 3: "CHUNK", 4: "END" };
+  var HASH_ALG = { 0: "none", 1: "sha-256", 2: "sha-512", 3: "blake3-256" };
+  var HASH_LEN = { 0: 0, 1: 32, 2: 64, 3: 32 };
+
+  var HEADER_MAGIC = "ASCENT/1.0\n";
+  var PLANE_P3 = 0x03;
+  // First scalar that requires LONG (F5 03 + u24be). Max 4-byte cp is U+2C27F.
+  var ASCENT_V_LONG_MIN = 0x2c280;
+
+  var FLAG_CRITICAL = 0x80;
+  var AGENT_VER_V1 = 0x01;
+  var AGENT_MAX_ARGS = 8192;
+  var AGENT_NAME_MAX = 64;
+  var LEAD_VERSION_BUMP = 0xc2;
+  var LEAD_REGISTRY_DELTA = 0xc3;
+  var LEAD_SKYSTATE = 0xc5;
+  var LEAD_TURN = 0xc6;
+  var LEAD_PRIVATE_OP = 0xcf;
+  var TURN_SCHEMA_V1 = 0x01;
+  var TURN_BODY_LEN = 27;
+  var TURN_BODY_LEN_CRC = 31;
+  var TURN_MAX_BODY = 256;
+  var TURN_FLAG_CRC = 0x01;
+  var TURN_FLAG_RESERVED_MASK = 0xfe;
+  var MM_FLAG_FINAL_HASH = 0x02;
+  var MM_FLAG_STREAM_ID = 0x04;
+  var PATHHINT_SCHEMA_V1 = 0x01;
+  var PATHHINT_BODY_LEN = 26;
+  var PATHHINT_BODY_LEN_CRC = 30;
+  var PATHHINT_MAX_BODY = 256;
+  var P2_SKIP_CAP = 16384;
+  var FLAG_CAP_KBPS = 0x01;
+  var FLAG_HAS_OBSTRUCTION = 0x02;
+  var FLAG_HAS_ELEV = 0x04;
+  var FLAG_RELATIVE_FREEZE = 0x08;
+  var FLAG_CRC = 0x10;
+  var FLAG_RESERVED_MASK = 0xe0;
+  var ELEV_ABSENT = 0x7fff;
+  var OBSTRUCTION_ABSENT = 0xff;
+
+  // SPEC.md E.2 interop hex
+  var HELLO_UNIVERSE_HEX =
+    "415343454E542F312E300A48656C6C6F" +
+    "2C20556E6976657273652E0A9AC10100" +
+    "020000060567756964659B9D4D010005" +
+    "0101E491921182DA9CB7B24E4B8A579D" +
+    "5E78EDC23E40141D015FAA097C3ECC6D" +
+    "65EB000000000000002A6369643A7368" +
+    "613235363A6161626263636464656566" +
+    "66303031313232333334343535363637" +
+    "37383839";
+
+  function AscentError(message) {
+    this.name = "AscentError";
+    this.message = message || "ASCENT codec error";
+    if (typeof Error.captureStackTrace === "function") {
+      Error.captureStackTrace(this, AscentError);
+    } else {
+      this.stack = new Error(this.message).stack;
+    }
+  }
+  AscentError.prototype = Object.create(Error.prototype);
+  AscentError.prototype.constructor = AscentError;
+
+  // ---------------------------------------------------------------------------
+  // Cont class (FROZEN) - primary continuation 0xA0-0xBF, 5 payload bits
+  // ---------------------------------------------------------------------------
+
+  var Cont = {
+    MIN: 0xa0,
+    MAX: 0xbf,
+    MASK: 0x1f,
+    contByte: function (n5) {
+      return 0xa0 | (n5 & 0x1f);
+    },
+    contVal: function (b) {
+      if (!(b >= 0xa0 && b <= 0xbf)) {
+        throw new AscentError("not a Cont byte: 0x" + b.toString(16));
+      }
+      return b & 0x1f;
+    },
+    isCont: function (b) {
+      return b >= 0xa0 && b <= 0xbf;
+    },
+  };
+
+  function contByte(n5) {
+    return Cont.contByte(n5);
+  }
+  function contVal(b) {
+    return Cont.contVal(b);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  function hexOf(u8) {
+    var out = "";
+    for (var i = 0; i < u8.length; i++) {
+      out += (u8[i] & 0xff).toString(16).padStart(2, "0");
+    }
+    return out;
+  }
+
+  function fromHex(hex) {
+    var clean = String(hex).replace(/\s+/g, "").replace(/^0x/i, "");
+    if (clean.length % 2) throw new AscentError("odd hex length");
+    if (!/^[0-9a-fA-F]*$/.test(clean)) throw new AscentError("invalid hex");
+    var out = new Uint8Array(clean.length / 2);
+    for (var i = 0; i < out.length; i++) {
+      out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+    }
+    return out;
+  }
+
+  function formatHexLines(u8, perLine) {
+    var n = perLine || 16;
+    var h = hexOf(u8).toUpperCase();
+    var lines = [];
+    for (var i = 0; i < h.length; i += n * 2) {
+      lines.push(h.slice(i, i + n * 2));
+    }
+    return lines.join("\n");
+  }
+
+  function u16be(u8, i) {
+    if (i + 2 > u8.length) throw new AscentError("truncated u16");
+    return [(u8[i] << 8) | u8[i + 1], i + 2];
+  }
+
+  function u32be(u8, i) {
+    if (i + 4 > u8.length) throw new AscentError("truncated u32");
+    return [
+      ((u8[i] << 24) | (u8[i + 1] << 16) | (u8[i + 2] << 8) | u8[i + 3]) >>> 0,
+      i + 4,
+    ];
+  }
+
+  function u64be(u8, i) {
+    if (i + 8 > u8.length) throw new AscentError("truncated u64");
+    var hi =
+      ((u8[i] << 24) | (u8[i + 1] << 16) | (u8[i + 2] << 8) | u8[i + 3]) >>> 0;
+    var lo =
+      ((u8[i + 4] << 24) |
+        (u8[i + 5] << 16) |
+        (u8[i + 6] << 8) |
+        u8[i + 7]) >>>
+      0;
+    // Safe for lab sizes (MM body hard cap applied by caller)
+    if (hi > 0x1fffff) throw new AscentError("u64 too large for browser codec");
+    var val = hi * 0x100000000 + lo;
+    return [val, i + 8];
+  }
+
+  function pushU16(out, n) {
+    out.push((n >> 8) & 0xff, n & 0xff);
+  }
+
+  function pushU32(out, n) {
+    n = n >>> 0;
+    out.push((n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff);
+  }
+
+  function pushI16(out, n) {
+    if (n < 0) n = (0x10000 + n) & 0xffff;
+    out.push((n >> 8) & 0xff, n & 0xff);
+  }
+
+  function i16be(u8, i) {
+    if (i + 2 > u8.length) throw new AscentError("truncated i16");
+    var v = (u8[i] << 8) | u8[i + 1];
+    if (v & 0x8000) v = v - 0x10000;
+    return [v, i + 2];
+  }
+
+  var CRC32_TABLE = (function () {
+    var t = new Uint32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) {
+        c = c & 1 ? (0xedb88320 ^ (c >>> 1)) : c >>> 1;
+      }
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32Ieee(u8) {
+    var c = 0xffffffff;
+    for (var i = 0; i < u8.length; i++) {
+      c = CRC32_TABLE[(c ^ u8[i]) & 0xff] ^ (c >>> 8);
+    }
+    return (c ^ 0xffffffff) >>> 0;
+  }
+
+  function pushU64(out, n) {
+    // big-endian u64; n is Number, lab sizes fit
+    var hi = Math.floor(n / 0x100000000);
+    var lo = n >>> 0;
+    out.push(
+      (hi >>> 24) & 0xff,
+      (hi >>> 16) & 0xff,
+      (hi >>> 8) & 0xff,
+      hi & 0xff,
+      (lo >>> 24) & 0xff,
+      (lo >>> 16) & 0xff,
+      (lo >>> 8) & 0xff,
+      lo & 0xff
+    );
+  }
+
+  function utf8Encode(str) {
+    if (typeof TextEncoder !== "undefined") {
+      return new TextEncoder().encode(str);
+    }
+    // Minimal fallback for pure BMP+ascii lab cases
+    var out = [];
+    for (var i = 0; i < str.length; i++) {
+      var cp = str.charCodeAt(i);
+      if (cp < 0x80) out.push(cp);
+      else if (cp < 0x800) {
+        out.push(0xc0 | (cp >> 6), 0x80 | (cp & 0x3f));
+      } else if (cp >= 0xd800 && cp <= 0xdbff && i + 1 < str.length) {
+        var lo = str.charCodeAt(i + 1);
+        if (lo >= 0xdc00 && lo <= 0xdfff) {
+          var full = 0x10000 + ((cp - 0xd800) << 10) + (lo - 0xdc00);
+          out.push(
+            0xf0 | (full >> 18),
+            0x80 | ((full >> 12) & 0x3f),
+            0x80 | ((full >> 6) & 0x3f),
+            0x80 | (full & 0x3f)
+          );
+          i++;
+          continue;
+        }
+        throw new AscentError("lone surrogate in utf8Encode");
+      } else {
+        out.push(
+          0xe0 | (cp >> 12),
+          0x80 | ((cp >> 6) & 0x3f),
+          0x80 | (cp & 0x3f)
+        );
+      }
+    }
+    return new Uint8Array(out);
+  }
+
+  function utf8Decode(u8) {
+    if (typeof TextDecoder !== "undefined") {
+      return new TextDecoder("utf-8", { fatal: false }).decode(u8);
+    }
+    var s = "";
+    for (var i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+    try {
+      return decodeURIComponent(escape(s));
+    } catch (e) {
+      return s;
+    }
+  }
+
+  function codePointsOf(text) {
+    // Iterate Unicode scalars (handles JS surrogate pairs)
+    var cps = [];
+    for (var i = 0; i < text.length; ) {
+      var cp = text.codePointAt(i);
+      cps.push(cp);
+      i += cp > 0xffff ? 2 : 1;
+    }
+    return cps;
+  }
+
+  // ---------------------------------------------------------------------------
+  // ASCENT-V scalar packing (FROZEN lab map)
+  // ---------------------------------------------------------------------------
+
+  function rejectSurrogate(cp) {
+    if (cp >= 0xd800 && cp <= 0xdfff) {
+      throw new AscentError(
+        "UTF-16 surrogates are illegal on ASCENT wire: U+" +
+          cp.toString(16).toUpperCase().padStart(4, "0")
+      );
+    }
+    if (cp < 0 || cp > 0x10ffff) {
+      throw new AscentError("codepoint out of range: 0x" + cp.toString(16));
+    }
+  }
+
+  function longFormRequired(cp) {
+    if (cp < 0x80 || cp > 0x10ffff) return false;
+    if (cp >= 0xd800 && cp <= 0xdfff) return false;
+    if (cp <= 0x427f) return false;
+    return cp - 0x4280 >= 5 << 15;
+  }
+
+  function rejectLongScalar(cp) {
+    if (cp >= 0xd800 && cp <= 0xdfff) {
+      throw new AscentError(
+        "surrogate on wire U+" + cp.toString(16).toUpperCase()
+      );
+    }
+    if (cp > 0x10ffff) {
+      throw new AscentError(
+        "scalar out of range U+" + cp.toString(16).toUpperCase()
+      );
+    }
+    if (cp < 0x80) {
+      throw new AscentError(
+        "overlong ASCII via LONG form U+" +
+          cp.toString(16).toUpperCase().padStart(4, "0")
+      );
+    }
+    if (!longFormRequired(cp)) {
+      throw new AscentError(
+        "non-minimal LONG form for U+" +
+          cp.toString(16).toUpperCase().padStart(4, "0")
+      );
+    }
+  }
+
+  function encodeScalar(cp) {
+    rejectSurrogate(cp);
+    if (cp < 0x80) return [cp];
+
+    // 2-byte: U+0080..U+027F
+    if (cp <= 0x027f) {
+      var v2 = cp - 0x80;
+      return [0xd0 | ((v2 >> 5) & 0x0f), contByte(v2 & 0x1f)];
+    }
+
+    // 3-byte: U+0280..U+427F
+    if (cp <= 0x427f) {
+      var v3 = cp - 0x280;
+      return [
+        0xe0 | ((v3 >> 10) & 0x0f),
+        contByte((v3 >> 5) & 0x1f),
+        contByte(v3 & 0x1f),
+      ];
+    }
+
+    // 4-byte: U+4280.. when v fits in 18 bits with top 0..4 (max cp U+2C27F)
+    var v4 = cp - 0x4280;
+    if (v4 >= 0 && v4 < (5 << 15)) {
+      var top = v4 >> 15; // 0..4
+      return [
+        0xf0 | top,
+        contByte((v4 >> 10) & 0x1f),
+        contByte((v4 >> 5) & 0x1f),
+        contByte(v4 & 0x1f),
+      ];
+    }
+
+    // LONG form: F5 03 + cp as u24be (P3 default plane)
+    if (cp > 0xffffff) {
+      throw new AscentError(
+        "scalar exceeds u24: U+" + cp.toString(16).toUpperCase()
+      );
+    }
+    return [0xf5, PLANE_P3, (cp >> 16) & 0xff, (cp >> 8) & 0xff, cp & 0xff];
+  }
+
+  function decodeAscentVAt(data, i) {
+    var n = data.length;
+    if (i >= n) return null;
+    var b0 = data[i];
+
+    // 2-byte D0-DF + Cont
+    if (b0 >= 0xd0 && b0 <= 0xdf) {
+      if (i + 1 >= n) throw new AscentError("truncated ASCENT-V 2-byte at " + i);
+      var c1 = data[i + 1];
+      if (!Cont.isCont(c1)) {
+        throw new AscentError("bad ASCENT-V 2-byte cont at " + i);
+      }
+      var v2 = ((b0 & 0x0f) << 5) | contVal(c1);
+      return { cp: 0x80 + v2, end: i + 2 };
+    }
+
+    // 3-byte E0-EF + 2 Cont
+    if (b0 >= 0xe0 && b0 <= 0xef) {
+      if (i + 2 >= n) throw new AscentError("truncated ASCENT-V 3-byte at " + i);
+      var c3a = data[i + 1];
+      var c3b = data[i + 2];
+      if (!(Cont.isCont(c3a) && Cont.isCont(c3b))) {
+        throw new AscentError("bad ASCENT-V 3-byte cont at " + i);
+      }
+      var v3 = ((b0 & 0x0f) << 10) | (contVal(c3a) << 5) | contVal(c3b);
+      return { cp: 0x280 + v3, end: i + 3 };
+    }
+
+    // 4-byte F0-F4 + 3 Cont
+    if (b0 >= 0xf0 && b0 <= 0xf4) {
+      if (i + 3 >= n) throw new AscentError("truncated ASCENT-V 4-byte at " + i);
+      var c4a = data[i + 1];
+      var c4b = data[i + 2];
+      var c4c = data[i + 3];
+      if (!(Cont.isCont(c4a) && Cont.isCont(c4b) && Cont.isCont(c4c))) {
+        throw new AscentError("bad ASCENT-V 4-byte cont at " + i);
+      }
+      var v4 =
+        ((b0 & 0x07) << 15) |
+        (contVal(c4a) << 10) |
+        (contVal(c4b) << 5) |
+        contVal(c4c);
+      var cp4 = 0x4280 + v4;
+      rejectSurrogate(cp4);
+      return { cp: cp4, end: i + 4 };
+    }
+
+    // LONG form F5 03 + u24be(cp)
+    if (b0 === 0xf5) {
+      if (i + 1 >= n) throw new AscentError("truncated F5 plane at " + i);
+      var plane = data[i + 1];
+      if (plane !== PLANE_P3) {
+        // Not the lab long-scalar form; not a V lead for text merge
+        return null;
+      }
+      if (i + 4 >= n) throw new AscentError("truncated F5 03 u24 at " + i);
+      var cp =
+        (data[i + 2] << 16) | (data[i + 3] << 8) | data[i + 4];
+      rejectLongScalar(cp);
+      return { cp: cp, end: i + 5 };
+    }
+
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Encode text (header / role / non-ascii modes)
+  // ---------------------------------------------------------------------------
+
+  var OPCODE_BY_NAME = {
+    STOP: 0x0001,
+    ROLE: 0x0002,
+    TOOL: 0x0003,
+    THINK: 0x0004,
+    HANDOFF: 0x0005,
+    CAP: 0x0006,
+    SAFETY: 0x0007,
+  };
+
+  function asciiBytes(str, label) {
+    var out = [];
+    var s = str == null ? "" : String(str);
+    for (var i = 0; i < s.length; i++) {
+      var cp = s.charCodeAt(i);
+      if (cp > 0x7f) {
+        throw new AscentError((label || "field") + " must be ASCII");
+      }
+      out.push(cp);
+    }
+    return out;
+  }
+
+  function validateAgentName(name) {
+    var s = name == null ? "" : String(name);
+    if (!s) throw new AscentError("agent name must be 1..64 charset bytes");
+    var out = asciiBytes(s, "agent name");
+    if (out.length > AGENT_NAME_MAX) {
+      throw new AscentError("agent name too long (max 64)");
+    }
+    for (var i = 0; i < out.length; i++) {
+      var b = out[i];
+      var ok =
+        (b >= 0x41 && b <= 0x5a) ||
+        (b >= 0x61 && b <= 0x7a) ||
+        (b >= 0x30 && b <= 0x39) ||
+        b === 0x5f ||
+        b === 0x2d ||
+        b === 0x2e;
+      if (!ok) throw new AscentError("agent name charset");
+    }
+    return out;
+  }
+
+  function escapeAgentArgs(raw) {
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var b = raw[i] & 0xff;
+      if (b === 0x9a || b === 0x9b || b === 0xc1) {
+        out.push(0xc1, 0x1b, b);
+      } else {
+        out.push(b);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Encode a P5 agent frame: 9A C1 ver opcode:u16be flags len:u16be args 9B
+   * opts: { opcode|opcodeName, ver, flags, args (Uint8Array|number[]), name (ROLE/TOOL/HANDOFF) }
+   */
+  function encodeAgentFrame(opts) {
+    var o = opts || {};
+    var opcode = o.opcode;
+    if (opcode == null && o.opcodeName) {
+      opcode = OPCODE_BY_NAME[String(o.opcodeName).toUpperCase()];
+    }
+    if (opcode == null) throw new AscentError("agent opcode required");
+    var ver = o.ver != null ? o.ver & 0xff : AGENT_VER_V1;
+    var flags = o.flags != null ? o.flags & 0xff : 0x00;
+    var args = [];
+    if (o.args) {
+      var src = o.args;
+      for (var ai = 0; ai < src.length; ai++) args.push(src[ai] & 0xff);
+    } else if (o.name != null && (opcode === 0x0002 || opcode === 0x0003 || opcode === 0x0005)) {
+      var nameBytes = validateAgentName(o.name);
+      args.push(nameBytes.length);
+      for (var nj = 0; nj < nameBytes.length; nj++) args.push(nameBytes[nj]);
+    } else if (o.payload != null) {
+      // Opaque THINK / SAFETY / CAP body as raw bytes or UTF-8 text
+      var pay =
+        typeof o.payload === "string" ? utf8Encode(o.payload) : o.payload;
+      for (var pi = 0; pi < pay.length; pi++) args.push(pay[pi] & 0xff);
+    }
+    args = escapeAgentArgs(args);
+    if (args.length > AGENT_MAX_ARGS) throw new AscentError("agent args exceed max 8192");
+    var out = [0x9a, 0xc1, ver];
+    pushU16(out, opcode);
+    out.push(flags);
+    pushU16(out, args.length);
+    for (var k = 0; k < args.length; k++) out.push(args[k]);
+    out.push(0x9b);
+    return out;
+  }
+
+  function encodeRoleFrame(role) {
+    return encodeAgentFrame({ opcode: 0x0002, name: role });
+  }
+
+  /**
+   * Multimodal unit: 9D 4D kind codec:u16be flags hash-alg [hash] len:u64be [body]
+   * opts: { mmKind|kindName, codec, flags, hashAlg, hash (Uint8Array), body|text|ref }
+   */
+  function encodeMm(opts) {
+    var o = opts || {};
+    var wireKind = o.mmKind;
+    if (wireKind == null && o.kindName) {
+      var kn = String(o.kindName).toUpperCase();
+      wireKind = kn === "REF" ? 1 : kn === "INLINE" ? 2 : kn === "CHUNK" ? 3 : kn === "END" ? 4 : null;
+    }
+    if (wireKind == null) wireKind = 2;
+    var codec = o.codec != null ? o.codec : 0x0001;
+    var flags = o.flags != null ? o.flags & 0xff : 0;
+    var hashAlg = o.hashAlg != null ? o.hashAlg & 0xff : 0;
+    var hlen = HASH_LEN[hashAlg];
+    if (hlen === undefined) throw new AscentError("unknown hash-alg " + hashAlg);
+    var digest = [];
+    if (o.hash) {
+      for (var hi = 0; hi < o.hash.length; hi++) digest.push(o.hash[hi] & 0xff);
+    }
+    if (digest.length !== hlen) {
+      if (hashAlg === 0) digest = [];
+      else if (digest.length === 0) {
+        for (var z = 0; z < hlen; z++) digest.push(0);
+      } else {
+        throw new AscentError("hash length mismatch for alg " + hashAlg);
+      }
+    }
+    var body;
+    if (o.body) body = o.body;
+    else if (o.ref != null) body = utf8Encode(String(o.ref));
+    else if (o.text != null) body = utf8Encode(String(o.text));
+    else body = new Uint8Array(0);
+    var out = [0x9d, 0x4d, wireKind & 0xff];
+    pushU16(out, codec);
+    out.push(flags);
+    out.push(hashAlg);
+    for (var d = 0; d < digest.length; d++) out.push(digest[d]);
+    pushU64(out, body.length);
+    for (var bi = 0; bi < body.length; bi++) out.push(body[bi] & 0xff);
+    return out;
+  }
+
+  function encodeMmInlineUtf8(body, codec) {
+    return encodeMm({
+      mmKind: 2,
+      codec: codec == null ? 0x0001 : codec,
+      hashAlg: 0,
+      body: body,
+    });
+  }
+
+  function encodeMmRef(ref, opts) {
+    var o = opts || {};
+    return encodeMm({
+      mmKind: 1,
+      codec: o.codec != null ? o.codec : 0x0005,
+      flags: o.flags || 0,
+      hashAlg: o.hashAlg != null ? o.hashAlg : 1,
+      hash: o.hash,
+      ref: ref,
+    });
+  }
+
+  /**
+   * Crypto envelope sketch: 9C 4B alg:u16be kid-len kid nonce-len nonce ct-len:u32be ct
+   * Lab only - not production crypto.
+   */
+  function encodeCrypto(opts) {
+    var o = opts || {};
+    var alg = o.alg != null ? o.alg : 0x010b; // AEGIR-DEMO
+    var kid = o.kid != null ? (typeof o.kid === "string" ? utf8Encode(o.kid) : o.kid) : utf8Encode("demo-kid");
+    var nonce =
+      o.nonce != null
+        ? typeof o.nonce === "string"
+          ? utf8Encode(o.nonce)
+          : o.nonce
+        : new Uint8Array(12);
+    var ct =
+      o.ct != null
+        ? typeof o.ct === "string"
+          ? utf8Encode(o.ct)
+          : o.ct
+        : new Uint8Array(0);
+    if (kid.length > 255) throw new AscentError("kid too long");
+    if (nonce.length > 255) throw new AscentError("nonce too long");
+    var out = [0x9c, 0x4b];
+    pushU16(out, alg);
+    out.push(kid.length);
+    for (var i = 0; i < kid.length; i++) out.push(kid[i] & 0xff);
+    out.push(nonce.length);
+    for (var j = 0; j < nonce.length; j++) out.push(nonce[j] & 0xff);
+    out.push(
+      (ct.length >>> 24) & 0xff,
+      (ct.length >>> 16) & 0xff,
+      (ct.length >>> 8) & 0xff,
+      ct.length & 0xff
+    );
+    for (var k = 0; k < ct.length; k++) out.push(ct[k] & 0xff);
+    return out;
+  }
+
+  function concatBytes(parts) {
+    var total = 0;
+    for (var i = 0; i < parts.length; i++) total += parts[i].length;
+    var out = new Uint8Array(total);
+    var o = 0;
+    for (var j = 0; j < parts.length; j++) {
+      out.set(parts[j] instanceof Uint8Array ? parts[j] : new Uint8Array(parts[j]), o);
+      o += parts[j].length;
+    }
+    return out;
+  }
+
+  /** Conformance helpers for the lab dashboard. */
+  function analyzeStream(u8) {
+    var pureP0 = true;
+    var p0 = 0;
+    var ext = 0;
+    var planeHits = {
+      P0: 0,
+      P1: 0,
+      P2: 0,
+      P3: 0,
+      P4: 0,
+      P5: 0,
+      P6: 0,
+      P7: 0,
+      P8: 0,
+      P9: 0,
+      P10: 0,
+    };
+    for (var i = 0; i < u8.length; i++) {
+      var b = u8[i];
+      if (b < 0x80) {
+        p0++;
+        planeHits.P0++;
+      } else {
+        pureP0 = false;
+        ext++;
+        if (b === 0x9a || b === 0x9b) planeHits.P5++;
+        else if (b === 0x9d || b === 0x4d) planeHits.P6++;
+        else if (b === 0x9c || b === 0x4b) planeHits.P7++;
+        else if (b === 0xc0) planeHits.P8++;
+        else if (b === 0xc1 || b === 0xc5) planeHits.P2++;
+        else if (b >= 0x80 && b <= 0x9f) planeHits.P1++;
+        else if (b >= 0xa0 && b <= 0xbf) planeHits.P3++;
+        else if (b >= 0xd0 && b <= 0xf5) planeHits.P3++;
+        else planeHits.P10++;
+      }
+    }
+    // P9 sync scan
+    for (var s = 0; s + 3 < u8.length; s++) {
+      if (
+        u8[s] === 0xd5 &&
+        u8[s + 1] === 0xe5 &&
+        u8[s + 2] === 0xc0 &&
+        u8[s + 3] === 0xde
+      ) {
+        planeHits.P9++;
+      }
+    }
+    var events = null;
+    var decodeOk = true;
+    var decodeError = null;
+    try {
+      events = decodeStream(u8);
+    } catch (e) {
+      decodeOk = false;
+      decodeError = e.message || String(e);
+    }
+    return {
+      total: u8.length,
+      p0: p0,
+      ext: ext,
+      p0pct: u8.length ? (100 * p0) / u8.length : 100,
+      pureAscent7: pureP0,
+      parseLawOk: true, // P0 bytes are never remapped by definition
+      decodeOk: decodeOk,
+      decodeError: decodeError,
+      planeHits: planeHits,
+      events: events,
+      unitKinds: events
+        ? events.map(function (e) {
+            return e.kind;
+          })
+        : [],
+    };
+  }
+
+  /**
+   * Encode plain text to ASCENT wire bytes (Uint8Array).
+   * opts: { header?: bool, roleName?: string, nonAscii?: "v"|"bridge"|"reject" }
+   */
+  function encodeText(text, opts) {
+    var o = opts || {};
+    var nonAscii = o.nonAscii || "v";
+    if (nonAscii !== "v" && nonAscii !== "bridge" && nonAscii !== "reject") {
+      throw new AscentError("unknown nonAscii mode: " + nonAscii);
+    }
+    var out = [];
+    if (o.header) {
+      for (var h = 0; h < HEADER_MAGIC.length; h++) {
+        out.push(HEADER_MAGIC.charCodeAt(h));
+      }
+    }
+
+    var s = text == null ? "" : String(text);
+
+    if (nonAscii === "reject") {
+      for (var r = 0; r < s.length; ) {
+        var rcp = s.codePointAt(r);
+        if (rcp > 0x7f) {
+          throw new AscentError(
+            "ASCENT-7 rejects non-ASCII U+" +
+              rcp.toString(16).toUpperCase().padStart(4, "0")
+          );
+        }
+        out.push(rcp);
+        r += 1;
+      }
+    } else if (nonAscii === "v") {
+      var cps = codePointsOf(s);
+      for (var vi = 0; vi < cps.length; vi++) {
+        var unit = encodeScalar(cps[vi]);
+        for (var uj = 0; uj < unit.length; uj++) out.push(unit[uj]);
+      }
+    } else {
+      // bridge: ASCII runs P0; non-ascii runs -> MM INLINE utf-8
+      var i = 0;
+      while (i < s.length) {
+        var cp = s.codePointAt(i);
+        rejectSurrogate(cp);
+        var step = cp > 0xffff ? 2 : 1;
+        if (cp < 0x80) {
+          out.push(cp);
+          i += step;
+          continue;
+        }
+        // gather non-ascii run (scalar by scalar)
+        var runStart = i;
+        while (i < s.length) {
+          var c2 = s.codePointAt(i);
+          rejectSurrogate(c2);
+          if (c2 < 0x80) break;
+          i += c2 > 0xffff ? 2 : 1;
+        }
+        var runStr = s.slice(runStart, i);
+        var body = utf8Encode(runStr);
+        var mm = encodeMmInlineUtf8(body, 0x0001);
+        for (var mj = 0; mj < mm.length; mj++) out.push(mm[mj]);
+      }
+    }
+
+    if (o.roleName) {
+      var roleBytes = encodeRoleFrame(String(o.roleName));
+      for (var rj = 0; rj < roleBytes.length; rj++) out.push(roleBytes[rj]);
+    }
+
+    return new Uint8Array(out);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Decode helpers (agent / mm / crypto / def)
+  // ---------------------------------------------------------------------------
+
+  function unescapeAgentArgs(raw) {
+    var out = [];
+    var i = 0;
+    while (i < raw.length) {
+      if (raw[i] === 0xc1) {
+        if (i + 1 < raw.length && raw[i + 1] === 0x1b) {
+          if (i + 2 >= raw.length) {
+            throw new AscentError("truncated fence escape");
+          }
+          out.push(raw[i + 2]);
+          i += 3;
+          continue;
+        }
+        out.push(0xc1);
+        i += 1;
+        continue;
+      }
+      if (raw[i] === 0x9a || raw[i] === 0x9b) {
+        throw new AscentError("bare fence byte inside agent args");
+      }
+      out.push(raw[i]);
+      i++;
+    }
+    return new Uint8Array(out);
+  }
+
+  function parseRoleOrName(args) {
+    if (!args.length) throw new AscentError("agent name missing");
+    var n = args[0];
+    if (n < 1) throw new AscentError("agent name must be 1..64 charset bytes");
+    if (1 + n > args.length) throw new AscentError("name_len exceeds args");
+    var nameBytes = args.slice(1, 1 + n);
+    var name = utf8Decode(nameBytes);
+    validateAgentName(name);
+    return { name: name, nameBytes: hexOf(nameBytes) };
+  }
+
+  function decodeAgent(body, start) {
+    var i = start + 1;
+    if (i >= body.length || body[i] !== 0xc1) {
+      throw new AscentError("AGENT_OPEN without C1 AGENT_OP");
+    }
+    i += 1;
+    if (i + 1 + 2 + 1 + 2 > body.length) {
+      throw new AscentError("truncated agent header");
+    }
+    var ver = body[i++];
+    var opcode;
+    var pair = u16be(body, i);
+    opcode = pair[0];
+    i = pair[1];
+    var flags = body[i++];
+    var alenPair = u16be(body, i);
+    var alen = alenPair[0];
+    i = alenPair[1];
+    if (alen > AGENT_MAX_ARGS) throw new AscentError("agent args exceed max 8192");
+    if (i + alen > body.length) throw new AscentError("truncated agent args");
+    var argsWire = body.slice(i, i + alen);
+    i += alen;
+    if (i >= body.length || body[i] !== 0x9b) {
+      throw new AscentError("AGENT missing CLOSE 0x9B");
+    }
+    i += 1;
+    var ev = {
+      kind: "agent",
+      ver: ver,
+      opcode: opcode,
+      opcodeName: OPCODE[opcode] || "UNKNOWN_0x" + opcode.toString(16),
+      flags: flags,
+      argsWireLen: alen,
+      argsHex: hexOf(argsWire),
+      skipped: false,
+      reason: "",
+      offset: start,
+      end: i,
+    };
+    if (ver !== AGENT_VER_V1) {
+      ev.skipped = true;
+      ev.reason = "unknown_ver";
+      return [ev, i];
+    }
+    var args = unescapeAgentArgs(argsWire);
+    ev.argsHex = hexOf(args);
+    if (!OPCODE[opcode]) {
+      if (flags & FLAG_CRITICAL) {
+        throw new AscentError(
+          "unknown CRITICAL opcode 0x" + opcode.toString(16)
+        );
+      }
+      ev.skipped = true;
+      ev.reason = "unknown_opcode";
+      return [ev, i];
+    }
+    if (opcode === 0x0002 || opcode === 0x0003 || opcode === 0x0005) {
+      var parsed = parseRoleOrName(args);
+      ev.name = parsed.name;
+      if (parsed.nameBytes) ev.nameBytes = parsed.nameBytes;
+    }
+    return [ev, i];
+  }
+
+  function decodeMm(body, start) {
+    // Decode multimodal frame. Event kind stays "multimodal"; wire kind -> mmKind.
+    var i = start + 1;
+    if (i >= body.length || body[i] !== 0x4d) {
+      throw new AscentError("MM_MARK without 0x4D 'M'");
+    }
+    i += 1;
+    if (i >= body.length) throw new AscentError("truncated MM kind");
+    var wireKind = body[i++];
+    var codecPair = u16be(body, i);
+    var codec = codecPair[0];
+    i = codecPair[1];
+    if (i >= body.length) throw new AscentError("truncated MM flags");
+    var flags = body[i++];
+    if (i >= body.length) throw new AscentError("truncated MM hash-alg");
+    var hashAlg = body[i++];
+    var hlen = HASH_LEN[hashAlg];
+    if (hlen === undefined) {
+      throw new AscentError("unknown hash-alg " + hashAlg);
+    }
+    if (i + hlen > body.length) throw new AscentError("truncated MM hash");
+    var digest = body.slice(i, i + hlen);
+    i += hlen;
+    var mlenPair = u64be(body, i);
+    var mlen = mlenPair[0];
+    i = mlenPair[1];
+    if (mlen > 256 * 1024 * 1024) {
+      throw new AscentError("MM body over hard cap");
+    }
+    if (i + mlen > body.length) throw new AscentError("truncated MM body");
+    var payload = body.slice(i, i + mlen);
+    i += mlen;
+    // Never put wire kind in field "kind" - that is the event type string.
+    var ev = {
+      kind: "multimodal",
+      mmKind: wireKind,
+      kindName: MM_KIND[wireKind] || "UNKNOWN_" + wireKind,
+      codec: codec,
+      flags: flags,
+      hashAlg: HASH_ALG[hashAlg] || String(hashAlg),
+      hashHex: hexOf(digest),
+      len: mlen,
+      offset: start,
+      end: i,
+    };
+    if (wireKind === 1) {
+      // REF
+      try {
+        ev.ref = utf8Decode(payload);
+      } catch (e) {
+        ev.refHex = hexOf(payload);
+      }
+    } else if (wireKind === 2) {
+      // INLINE
+      if (codec === 0x0001) {
+        try {
+          ev.text = utf8Decode(payload);
+        } catch (e2) {
+          ev.bodyHex =
+            mlen <= 64
+              ? hexOf(payload)
+              : hexOf(payload.slice(0, 32)) + "...";
+        }
+      } else {
+        ev.bodyHex =
+          mlen <= 64 ? hexOf(payload) : hexOf(payload.slice(0, 32)) + "...";
+      }
+    } else {
+      ev.bodyHex =
+        mlen <= 64 ? hexOf(payload) : hexOf(payload.slice(0, 32)) + "...";
+    }
+    if (wireKind === 3 || wireKind === 4) {
+      annotateMmChunk(ev, payload, flags, wireKind);
+    }
+    return [ev, i];
+  }
+
+  function annotateMmChunk(ev, payload, flags, wireKind) {
+    var rest = payload;
+    var off = 0;
+    if (flags & MM_FLAG_STREAM_ID) {
+      if (rest.length < 8) {
+        ev.malformed = true;
+        ev.reason = "truncated_stream_id";
+        return;
+      }
+      var sid = u64be(rest, 0);
+      ev.streamId = sid[0];
+      ev.stream_id = sid[0];
+      off = 8;
+    }
+    if (wireKind === 3) {
+      if (rest.length < off + 4) {
+        ev.malformed = true;
+        ev.reason = "truncated_chunk_index";
+        return;
+      }
+      var idx = u32be(rest, off);
+      ev.chunkIndex = idx[0];
+      ev.chunk_index = idx[0];
+      ev.payloadHex = hexOf(rest.slice(off + 4));
+      ev.payload_hex = ev.payloadHex;
+    } else {
+      ev.endBodyHex = hexOf(rest.slice(off));
+      ev.finalHash = !!(flags & MM_FLAG_FINAL_HASH);
+      ev.final_hash = ev.finalHash;
+    }
+  }
+
+  function reassembleChunks(events) {
+    var buffers = {};
+    var order = [];
+    function slot(key) {
+      var k = key === null || key === undefined ? "bare" : "s" + key;
+      if (!buffers[k]) {
+        buffers[k] = {
+          key: key === undefined ? null : key,
+          chunks: {},
+          ended: false,
+          malformed: false,
+          reason: "",
+          hashHex: "",
+          hashAlg: "",
+          finalHash: false,
+        };
+        order.push(k);
+      }
+      return buffers[k];
+    }
+    for (var n = 0; n < events.length; n++) {
+      var ev = events[n];
+      if (!ev || ev.kind !== "multimodal") continue;
+      var mk = ev.mmKind;
+      if (mk !== 3 && mk !== 4) continue;
+      var hasSid = ev.streamId !== undefined || ev.stream_id !== undefined;
+      var key = hasSid ? (ev.streamId !== undefined ? ev.streamId : ev.stream_id) : null;
+      if (!hasSid && buffers.bare && buffers.bare.ended && mk === 3) {
+        var bad = slot(null);
+        bad.malformed = true;
+        bad.reason = "second_bare_stream";
+        continue;
+      }
+      var s = slot(key);
+      if (ev.malformed) {
+        s.malformed = true;
+        s.reason = ev.reason || "malformed";
+        s.chunks = {};
+        continue;
+      }
+      if (s.malformed) continue;
+      if (mk === 3) {
+        var idx = ev.chunkIndex !== undefined ? ev.chunkIndex : ev.chunk_index;
+        if (idx === undefined) {
+          s.malformed = true;
+          s.reason = "truncated_chunk_index";
+          s.chunks = {};
+          continue;
+        }
+        if (s.chunks[idx]) {
+          s.malformed = true;
+          s.reason = "duplicate_chunk_index";
+          s.chunks = {};
+          continue;
+        }
+        s.chunks[idx] = ev.payloadHex || ev.payload_hex || "";
+      } else {
+        s.ended = true;
+        s.hashHex = ev.hashHex || "";
+        s.hashAlg = ev.hashAlg || "";
+        s.finalHash = !!(ev.finalHash || ev.final_hash || (ev.flags & MM_FLAG_FINAL_HASH));
+      }
+    }
+    var out = [];
+    for (var i = 0; i < order.length; i++) {
+      var buf = buffers[order[i]];
+      var base = {
+        streamId: buf.key,
+        stream_id: buf.key,
+        status: "incomplete",
+        reason: buf.reason,
+        payloadHex: "",
+        payload_hex: "",
+        hashValid: false,
+        hash_valid: false,
+        emitted: false,
+      };
+      if (buf.malformed) {
+        base.status = "malformed";
+        out.push(base);
+        continue;
+      }
+      if (!buf.ended) {
+        base.reason = "missing_end";
+        out.push(base);
+        continue;
+      }
+      var indexes = Object.keys(buf.chunks)
+        .map(function (x) { return parseInt(x, 10); })
+        .sort(function (a, b) { return a - b; });
+      if (!indexes.length) {
+        base.reason = "empty";
+        out.push(base);
+        continue;
+      }
+      var gap = false;
+      for (var g = 1; g < indexes.length; g++) {
+        if (indexes[g] !== indexes[g - 1] + 1) gap = true;
+      }
+      if (gap) {
+        base.reason = "gap_at_end";
+        out.push(base);
+        continue;
+      }
+      var hex = indexes.map(function (ix) { return buf.chunks[ix]; }).join("");
+      base.status = "complete";
+      base.reason = "";
+      base.payloadHex = hex;
+      base.payload_hex = hex;
+      base.hashValid = !buf.finalHash;
+      base.hash_valid = base.hashValid;
+      base.hashNote = buf.finalHash
+        ? "sha-256 FINAL_HASH is checked by the Python golden"
+        : "";
+      base.emitted = true;
+      out.push(base);
+    }
+    return out;
+  }
+
+  function decodeCrypto(body, start) {
+    var i = start + 1;
+    if (i >= body.length || body[i] !== 0x4b) {
+      throw new AscentError("CRYPTO_MARK without 0x4B 'K'");
+    }
+    i += 1;
+    var algPair = u16be(body, i);
+    var alg = algPair[0];
+    i = algPair[1];
+    if (i >= body.length) throw new AscentError("truncated crypto kid-len");
+    var kidLen = body[i++];
+    if (i + kidLen > body.length) throw new AscentError("truncated kid");
+    var kid = body.slice(i, i + kidLen);
+    i += kidLen;
+    if (i >= body.length) throw new AscentError("truncated nonce-len");
+    var nonceLen = body[i++];
+    if (i + nonceLen > body.length) throw new AscentError("truncated nonce");
+    var nonce = body.slice(i, i + nonceLen);
+    i += nonceLen;
+    var ctPair = u32be(body, i);
+    var ctLen = ctPair[0];
+    i = ctPair[1];
+    if (i + ctLen > body.length) throw new AscentError("truncated ciphertext");
+    i += ctLen;
+    return [
+      {
+        kind: "crypto",
+        alg: alg,
+        kidHex: hexOf(kid),
+        nonceHex: hexOf(nonce),
+        ctLen: ctLen,
+        offset: start,
+        end: i,
+      },
+      i,
+    ];
+  }
+
+  function decodeDef(body, start) {
+    var i = start + 1;
+    if (i >= body.length) throw new AscentError("truncated DEF schema");
+    var schema = body[i++];
+    var dPair = u32be(body, i);
+    var dlen = dPair[0];
+    i = dPair[1];
+    if (dlen > 16 * 1024 * 1024) throw new AscentError("DEF over hard cap");
+    if (i + dlen > body.length) throw new AscentError("truncated DEF body");
+    i += dlen;
+    return [
+      {
+        kind: "def",
+        schema: schema,
+        len: dlen,
+        offset: start,
+        end: i,
+      },
+      i,
+    ];
+  }
+
+  function pathhintSkipEvent(start, end, schema, reason, flags, bodyLen) {
+    return {
+      kind: "pathhint",
+      schema: schema,
+      applied: false,
+      skipped: true,
+      reason: reason,
+      flags: flags || 0,
+      len: bodyLen || 0,
+      offset: start,
+      end: end,
+    };
+  }
+
+  function parsePathhintV1Body(body, start, end, schema) {
+    if (!body.length) {
+      return pathhintSkipEvent(start, end, schema, "truncated_body", 0, 0);
+    }
+    var flags = body[0];
+    if (flags & FLAG_RESERVED_MASK) {
+      return pathhintSkipEvent(
+        start,
+        end,
+        schema,
+        "unknown_flags",
+        flags,
+        body.length
+      );
+    }
+    var want = flags & FLAG_CRC ? PATHHINT_BODY_LEN_CRC : PATHHINT_BODY_LEN;
+    if (body.length !== want) {
+      return pathhintSkipEvent(
+        start,
+        end,
+        schema,
+        "bad_body_len",
+        flags,
+        body.length
+      );
+    }
+    if (!(flags & FLAG_RELATIVE_FREEZE)) {
+      return pathhintSkipEvent(
+        start,
+        end,
+        schema,
+        "missing_freeze_until",
+        flags,
+        body.length
+      );
+    }
+    if (flags & FLAG_CRC) {
+      var got =
+        ((body[PATHHINT_BODY_LEN] << 24) |
+          (body[PATHHINT_BODY_LEN + 1] << 16) |
+          (body[PATHHINT_BODY_LEN + 2] << 8) |
+          body[PATHHINT_BODY_LEN + 3]) >>>
+        0;
+      var expect = crc32Ieee(body.slice(0, PATHHINT_BODY_LEN));
+      if (got !== expect) {
+        return pathhintSkipEvent(start, end, schema, "crc_fail", flags, body.length);
+      }
+    }
+    var pathPair = u64be(body, 1);
+    var pathId = pathPair[0];
+    var capPair = u32be(body, 9);
+    var capRaw = capPair[0];
+    var freezePair = u32be(body, 13);
+    var freezeMs = freezePair[0];
+    var confPair = u16be(body, 17);
+    var confU16 = confPair[0];
+    var ttlPair = u32be(body, 19);
+    var ttlMs = ttlPair[0];
+    var obstU8 = body[23];
+    var elevPair = i16be(body, 24);
+    var elevI16 = elevPair[0];
+    if (confU16 > 10000) {
+      return pathhintSkipEvent(
+        start,
+        end,
+        schema,
+        "confidence_range",
+        flags,
+        body.length
+      );
+    }
+    var nextBps = flags & FLAG_CAP_KBPS ? capRaw * 1000 : capRaw;
+    var nextKbps = flags & FLAG_CAP_KBPS ? capRaw : capRaw ? Math.floor((capRaw + 999) / 1000) : 0;
+    var obst = flags & FLAG_HAS_OBSTRUCTION ? obstU8 / 255.0 : null;
+    var elev =
+      flags & FLAG_HAS_ELEV && elevI16 !== ELEV_ABSENT ? elevI16 / 10.0 : null;
+    return {
+      kind: "pathhint",
+      schema: schema,
+      applied: true,
+      skipped: false,
+      reason: "",
+      flags: flags,
+      pathId: pathId,
+      path_id: pathId,
+      nextCapacityBps: nextBps,
+      next_capacity_bps: nextBps,
+      nextCapacityKbps: nextKbps,
+      next_capacity_kbps: nextKbps,
+      nextCapacityMeaning: "predicted_bottleneck_bps_sender",
+      next_capacity_meaning: "predicted_bottleneck_bps_sender",
+      freezeMs: freezeMs,
+      freeze_ms: freezeMs,
+      freezeUntilMs: freezeMs,
+      freeze_until_ms: freezeMs,
+      confidence: confU16 / 10000.0,
+      ttlMs: ttlMs,
+      ttl_ms: ttlMs,
+      obstruction: obst,
+      elevDeg: elev,
+      elev_deg: elev,
+      crc: !!(flags & FLAG_CRC),
+      len: body.length,
+      offset: start,
+      end: end,
+    };
+  }
+
+  function decodeSkystate(body, start) {
+    var i = start + 1;
+    if (i >= body.length) throw new AscentError("truncated SKYSTATE schema");
+    var schema = body[i++];
+    var lenPair = u16be(body, i);
+    var blen = lenPair[0];
+    i = lenPair[1];
+    if (blen > P2_SKIP_CAP) throw new AscentError("SKYSTATE body over skip cap");
+    if (i + blen > body.length) throw new AscentError("truncated SKYSTATE body");
+    var payload = body.slice(i, i + blen);
+    i += blen;
+    if (schema !== PATHHINT_SCHEMA_V1) {
+      return [pathhintSkipEvent(start, i, schema, "unknown_schema", 0, blen), i];
+    }
+    if (blen > PATHHINT_MAX_BODY) {
+      return [pathhintSkipEvent(start, i, schema, "over_schema_cap", 0, blen), i];
+    }
+    return [parsePathhintV1Body(payload, start, i, schema), i];
+  }
+
+  function encodePathhint(opts) {
+    opts = opts || {};
+    var pathId = opts.pathId != null ? opts.pathId : opts.path_id != null ? opts.path_id : 0;
+    var confidence =
+      opts.confidence != null ? Number(opts.confidence) : 0;
+    if (confidence < 0 || confidence > 1) {
+      throw new AscentError("confidence must be in [0, 1]");
+    }
+    var freezeMs =
+      opts.freezeMs != null
+        ? opts.freezeMs
+        : opts.freeze_ms != null
+          ? opts.freeze_ms
+          : opts.freezeUntilMs != null
+            ? opts.freezeUntilMs
+            : opts.freeze_until_ms != null
+              ? opts.freeze_until_ms
+              : 0;
+    var ttlMs = opts.ttlMs != null ? opts.ttlMs : opts.ttl_ms != null ? opts.ttl_ms : 0;
+    if (freezeMs < 0 || ttlMs < 0) {
+      throw new AscentError("freeze_ms and ttl_ms must be >= 0");
+    }
+    var flags = FLAG_RELATIVE_FREEZE;
+    var capRaw = 0;
+    var bps = opts.nextCapacityBps != null ? opts.nextCapacityBps : opts.next_capacity_bps;
+    var kbps = opts.nextCapacityKbps != null ? opts.nextCapacityKbps : opts.next_capacity_kbps;
+    if (kbps != null && bps != null) {
+      throw new AscentError("pass next_capacity_bps or next_capacity_kbps, not both");
+    }
+    if (kbps != null) {
+      flags |= FLAG_CAP_KBPS;
+      capRaw = kbps >>> 0;
+    } else if (bps == null) {
+      capRaw = 0;
+    } else if (bps > 0xffffffff) {
+      flags |= FLAG_CAP_KBPS;
+      capRaw = Math.floor((bps + 999) / 1000) >>> 0;
+    } else {
+      capRaw = bps >>> 0;
+    }
+    var obst = opts.obstruction;
+    var obstU8 = OBSTRUCTION_ABSENT;
+    if (obst != null && obst !== "") {
+      obst = Number(obst);
+      if (obst < 0 || obst > 1) throw new AscentError("obstruction must be in [0, 1]");
+      flags |= FLAG_HAS_OBSTRUCTION;
+      obstU8 = Math.round(obst * 255);
+      if (obstU8 > 255) obstU8 = 255;
+    }
+    var elev = opts.elevDeg != null ? opts.elevDeg : opts.elev_deg;
+    var elevI16 = ELEV_ABSENT;
+    if (elev != null && elev !== "") {
+      elev = Number(elev);
+      if (elev < -90 || elev > 90) throw new AscentError("elev_deg must be in [-90, 90]");
+      flags |= FLAG_HAS_ELEV;
+      elevI16 = Math.round(elev * 10);
+    }
+    var wantCrc = !!(opts.crc || opts.useCrc);
+    if (wantCrc) flags |= FLAG_CRC;
+    var confU16 = Math.round(confidence * 10000);
+    var body = [];
+    body.push(flags & 0xff);
+    pushU64(body, pathId);
+    pushU32(body, capRaw);
+    pushU32(body, freezeMs >>> 0);
+    pushU16(body, confU16);
+    pushU32(body, ttlMs >>> 0);
+    body.push(obstU8);
+    pushI16(body, elevI16);
+    if (body.length !== PATHHINT_BODY_LEN) {
+      throw new AscentError("PATHHINT v1 body length bug");
+    }
+    if (wantCrc) {
+      var crc = crc32Ieee(new Uint8Array(body));
+      pushU32(body, crc);
+    }
+    var out = [LEAD_SKYSTATE, PATHHINT_SCHEMA_V1];
+    pushU16(out, body.length);
+    return new Uint8Array(out.concat(body));
+  }
+
+  function canonicalPathhintBytes(crc) {
+    return encodePathhint({
+      pathId: 0x42,
+      nextCapacityBps: 50000000,
+      freezeMs: 15000,
+      confidence: 0.8,
+      ttlMs: 30000,
+      obstruction: 0.2,
+      elevDeg: 42.0,
+      crc: !!crc,
+    });
+  }
+
+  function encodeTurn(opts) {
+    opts = opts || {};
+    var session = opts.session != null ? opts.session : 0;
+    var turn = opts.turn != null ? opts.turn : 0;
+    var corr = opts.corr != null ? opts.corr : 0;
+    var lifetime = opts.lifetimeS != null ? opts.lifetimeS : opts.lifetime_s || 0;
+    var role = opts.role != null ? opts.role : 1;
+    var wantCrc = opts.crc !== false;
+    if (role !== 1 && role !== 2 && role !== 3) {
+      throw new AscentError("role must be 1, 2, or 3");
+    }
+    var flags = wantCrc ? TURN_FLAG_CRC : 0;
+    var body = [];
+    body.push(flags & 0xff);
+    pushU64(body, session);
+    pushU32(body, turn >>> 0);
+    pushU64(body, corr);
+    pushU32(body, lifetime >>> 0);
+    body.push(role & 0xff);
+    body.push(0);
+    if (body.length !== TURN_BODY_LEN) {
+      throw new AscentError("TURN v1 body length bug");
+    }
+    if (wantCrc) {
+      pushU32(body, crc32Ieee(new Uint8Array(body)));
+    }
+    var out = [LEAD_TURN, TURN_SCHEMA_V1];
+    pushU16(out, body.length);
+    return new Uint8Array(out.concat(body));
+  }
+
+  function turnSkipEvent(start, end, schema, reason, flags, bodyLen) {
+    return {
+      kind: "turn",
+      schema: schema,
+      applied: false,
+      skipped: true,
+      reason: reason,
+      flags: flags || 0,
+      len: bodyLen || 0,
+      offset: start,
+      end: end,
+    };
+  }
+
+  function parseTurnV1(body, start, end, schema) {
+    if (!body.length) {
+      return turnSkipEvent(start, end, schema, "truncated_body", 0, 0);
+    }
+    var flags = body[0];
+    if (flags & TURN_FLAG_RESERVED_MASK) {
+      return turnSkipEvent(start, end, schema, "unknown_flags", flags, body.length);
+    }
+    var want = flags & TURN_FLAG_CRC ? TURN_BODY_LEN_CRC : TURN_BODY_LEN;
+    if (body.length !== want) {
+      return turnSkipEvent(start, end, schema, "bad_body_len", flags, body.length);
+    }
+    if (flags & TURN_FLAG_CRC) {
+      var got = u32be(body, TURN_BODY_LEN)[0];
+      var expect = crc32Ieee(body.slice(0, TURN_BODY_LEN));
+      if (got !== expect) {
+        return turnSkipEvent(start, end, schema, "crc_fail", flags, body.length);
+      }
+    }
+    var session = u64be(body, 1)[0];
+    var turn = u32be(body, 9)[0];
+    var corr = u64be(body, 13)[0];
+    var lifetime = u32be(body, 21)[0];
+    var role = body[25];
+    var reserved = body[26];
+    if (reserved !== 0) {
+      return turnSkipEvent(start, end, schema, "bad_reserved", flags, body.length);
+    }
+    if (role !== 1 && role !== 2 && role !== 3) {
+      return turnSkipEvent(start, end, schema, "bad_role", flags, body.length);
+    }
+    var roleName = role === 1 ? "request" : role === 2 ? "response" : "ack-erase";
+    return {
+      kind: "turn",
+      schema: schema,
+      applied: true,
+      skipped: false,
+      reason: "",
+      flags: flags,
+      session: session,
+      turn: turn,
+      corr: corr,
+      lifetimeS: lifetime,
+      lifetime_s: lifetime,
+      role: role,
+      roleName: roleName,
+      role_name: roleName,
+      crc: !!(flags & TURN_FLAG_CRC),
+      len: body.length,
+      offset: start,
+      end: end,
+    };
+  }
+
+  function decodeTurn(body, start) {
+    var i = start + 1;
+    if (i >= body.length) throw new AscentError("truncated TURN schema");
+    var schema = body[i++];
+    var lenPair = u16be(body, i);
+    var blen = lenPair[0];
+    i = lenPair[1];
+    if (blen > P2_SKIP_CAP) throw new AscentError("TURN body over skip cap");
+    if (i + blen > body.length) throw new AscentError("truncated TURN body");
+    var payload = body.slice(i, i + blen);
+    i += blen;
+    if (schema !== TURN_SCHEMA_V1) {
+      return [turnSkipEvent(start, i, schema, "unknown_schema", 0, blen), i];
+    }
+    if (blen > TURN_MAX_BODY) {
+      return [turnSkipEvent(start, i, schema, "over_schema_cap", 0, blen), i];
+    }
+    return [parseTurnV1(payload, start, i, schema), i];
+  }
+
+  function canonicalTurnBytes(crc) {
+    return encodeTurn({
+      session: 0xa5ce47,
+      turn: 1,
+      corr: 0x1001,
+      lifetimeS: 3600,
+      role: 1,
+      crc: crc !== false,
+    });
+  }
+
+  function encodeMmChunk(payload, chunkIndex, streamId) {
+    var flags = 0;
+    var body = [];
+    if (streamId !== undefined && streamId !== null) {
+      flags |= MM_FLAG_STREAM_ID;
+      pushU64(body, streamId);
+    }
+    pushU32(body, chunkIndex >>> 0);
+    var bytes = payload instanceof Uint8Array ? payload : utf8Encode(String(payload));
+    for (var i = 0; i < bytes.length; i++) body.push(bytes[i]);
+    var out = [0x9d, 0x4d, 3];
+    pushU16(out, 0x0005);
+    out.push(flags & 0xff);
+    out.push(0);
+    pushU64(out, body.length);
+    return new Uint8Array(out.concat(body));
+  }
+
+  function encodeMmEnd(streamId) {
+    var flags = 0;
+    var body = [];
+    if (streamId !== undefined && streamId !== null) {
+      flags |= MM_FLAG_STREAM_ID;
+      pushU64(body, streamId);
+    }
+    var out = [0x9d, 0x4d, 4];
+    pushU16(out, 0x0005);
+    out.push(flags & 0xff);
+    out.push(0);
+    pushU64(out, body.length);
+    return new Uint8Array(out.concat(body));
+  }
+
+  function recommendIntegrity(profile) {
+    var p = String(profile || "")
+      .trim()
+      .toUpperCase()
+      .replace(/_/g, "-");
+    if (
+      p === "ASCENT-D" ||
+      p === "D" ||
+      p === "DEEP" ||
+      p === "DEEP-SPACE" ||
+      p === "SPOOL"
+    ) {
+      return {
+        profile: "ASCENT-D",
+        mode: "p9",
+        doubleFec: false,
+        usePathhintCrc: false,
+        wrapP9: true,
+        note:
+          "ASCENT-D: full RS(255,223) P9 erase-on-fail for spool/deep-space/high-BER only. Skip extra PATHHINT CRC. Not for interactive Starlink IP/QUIC.",
+      };
+    }
+    if (
+      p === "ASCENT-E-LEO" ||
+      p === "E-LEO" ||
+      p === "LEO" ||
+      p === "LEO-IP" ||
+      p === "STARLINK" ||
+      p === "SKY" ||
+      p === "SKYPULSE"
+    ) {
+      return {
+        profile: "ASCENT-E-LEO",
+        mode: "crc",
+        doubleFec: false,
+        usePathhintCrc: true,
+        wrapP9: false,
+        note:
+          "ASCENT-E-LEO: Starlink IP/QUIC. Light integrity = PATHHINT CRC (v1) or short RS(255,239) I=1; never full RS(255,223). next_capacity is predicted sender bottleneck bps, not RF PHY. Do not wrap interactive turns in P9.",
+      };
+    }
+    return {
+      profile: "ASCENT-E",
+      mode: "none",
+      doubleFec: false,
+      usePathhintCrc: false,
+      wrapP9: false,
+      note: "ASCENT-E default: plain PATHHINT unit; optional CRC. P9 only if integrity requested.",
+    };
+  }
+
+  function recommendStack(path) {
+    var p = String(path || "")
+      .trim()
+      .toUpperCase()
+      .replace(/_/g, "-");
+    if (
+      p === "B" ||
+      p === "CLA" ||
+      p === "CONVERGENCE" ||
+      p === "CONVERGENCE-LAYER" ||
+      p === "ASCENT-CLA" ||
+      p === "LTPCL-ASCENT"
+    ) {
+      return {
+        placement: "B",
+        allowed: false,
+        bp: false,
+        ascentD: false,
+        note:
+          "Reject (B): ASCENT is a content/agent wire, not a hop transport. Do not encode agent planes as LTP segments or invent an ASCENT CLA.",
+      };
+    }
+    if (
+      p === "DEEP" ||
+      p === "DEEP-SPACE" ||
+      p === "DTN" ||
+      p === "BP" ||
+      p === "BPV7" ||
+      p === "BUNDLE" ||
+      p === "A" ||
+      p === "A+C" ||
+      p === "C" ||
+      p === "ION" ||
+      p === "HDTN" ||
+      p === "UD3TN" ||
+      p === "LUNAR" ||
+      p === "MARS"
+    ) {
+      return {
+        placement: "A+C",
+        allowed: true,
+        bp: true,
+        ascentD: true,
+        note:
+          "Deep space: ADU = ASCENT frame(s) inside BPv7 (A). ASCENT-D RS(255,223) erase-on-fail is end-to-end app integrity (C). Hop reliability stays LTP/ECLSA/TM coding. Not a Starlink IP default.",
+      };
+    }
+    return {
+      placement: "D",
+      allowed: true,
+      bp: false,
+      ascentD: false,
+      note:
+        "Starlink IP / LEO with end-to-end IP: ASCENT over UDP/QUIC/TCP without BP/LTP. Optional P9 only for spool or high-BER, never as a PHY Mbps claim.",
+    };
+  }
+
+  function evaluatePathhint(ev, opts) {
+    opts = opts || {};
+    var out = {};
+    for (var k in ev) {
+      if (Object.prototype.hasOwnProperty.call(ev, k)) out[k] = ev[k];
+    }
+    if (!out.applied) return out;
+    var schema = out.schema != null ? out.schema : 0;
+    if (schema !== 1) {
+      out.applied = false;
+      out.skipped = true;
+      out.reason = "unknown_schema";
+      return out;
+    }
+    var nowMs = opts.nowMs != null ? opts.nowMs : opts.now_ms;
+    var recvMs = opts.receivedAtMs != null ? opts.receivedAtMs : opts.received_at_ms;
+    var ttl = out.ttlMs != null ? out.ttlMs : out.ttl_ms;
+    if (nowMs != null && recvMs != null && ttl != null) {
+      if (nowMs > recvMs + ttl) {
+        out.applied = false;
+        out.skipped = true;
+        out.reason = "ttl_expired";
+      }
+    }
+    return out;
+  }
+
+  function pathhintOverheadBytes(crc) {
+    return crc ? 34 : 30;
+  }
+
+  /**
+   * Full decode to list of event objects.
+   * P0 + ASCENT-V scalars merge into continuous text events
+   * (kind="text", text=..., ascii=..., offset, end).
+   * agent / multimodal (mmKind) / def / crypto / pathhint / pad as separate events.
+   * Never overwrite event kind with numeric wire fields.
+   */
+  function p2SkipEvent(lead, leadName, start, end, bodyLen, extra) {
+    var ev = {
+      kind: "skip",
+      lead: lead,
+      leadName: leadName,
+      lead_name: leadName,
+      skipped: true,
+      len: bodyLen,
+      offset: start,
+      end: end,
+    };
+    if (extra) {
+      for (var k in extra) {
+        if (Object.prototype.hasOwnProperty.call(extra, k)) ev[k] = extra[k];
+      }
+    }
+    return ev;
+  }
+
+  function decodeP2U16Skip(body, start, leadName) {
+    var i = start + 1;
+    var pair = u16be(body, i);
+    var blen = pair[0];
+    i = pair[1];
+    if (blen > P2_SKIP_CAP) throw new AscentError(leadName + " body over skip cap");
+    if (i + blen > body.length) throw new AscentError("truncated " + leadName + " body");
+    i += blen;
+    return [p2SkipEvent(body[start], leadName, start, i, blen), i];
+  }
+
+  function decodeP2U32Skip(body, start, leadName) {
+    var i = start + 1;
+    var pair = u32be(body, i);
+    var blen = pair[0];
+    i = pair[1];
+    if (blen > P2_SKIP_CAP) throw new AscentError(leadName + " body over skip cap");
+    if (i + blen > body.length) throw new AscentError("truncated " + leadName + " body");
+    i += blen;
+    return [p2SkipEvent(body[start], leadName, start, i, blen), i];
+  }
+
+  function decodePrivateOpSkip(body, start) {
+    var i = start + 1;
+    var planePair = u16be(body, i);
+    var plane = planePair[0];
+    i = planePair[1];
+    var lenPair = u32be(body, i);
+    var blen = lenPair[0];
+    i = lenPair[1];
+    if (blen > P2_SKIP_CAP) throw new AscentError("PRIVATE_OP body over skip cap");
+    if (i + blen > body.length) throw new AscentError("truncated PRIVATE_OP body");
+    i += blen;
+    return [p2SkipEvent(LEAD_PRIVATE_OP, "PRIVATE_OP", start, i, blen, { plane: plane }), i];
+  }
+
+  function decodeStream(data) {
+    var events = [];
+    var i = 0;
+    var textChars = [];
+    var textStart = 0;
+
+    function flushText(end) {
+      if (!textChars.length) return;
+      var s = textChars.join("");
+      var hasHigh = false;
+      for (var t = 0; t < s.length; t++) {
+        if (s.charCodeAt(t) > 0x7f) {
+          hasHigh = true;
+          break;
+        }
+      }
+      events.push({
+        kind: "text",
+        text: s,
+        ascii: s,
+        len: hasHigh ? utf8Encode(s).length : s.length,
+        offset: textStart,
+        end: end,
+      });
+      textChars = [];
+    }
+
+    function pushChar(ch, at) {
+      if (!textChars.length) textStart = at;
+      textChars.push(ch);
+    }
+
+    while (i < data.length) {
+      var b = data[i];
+      if (b < 0x80) {
+        // P0: String.fromCharCode for 0x00-0x7F (TextDecoder("ascii") unsupported)
+        pushChar(String.fromCharCode(b), i);
+        i += 1;
+        continue;
+      }
+
+      // ASCENT-V (including F5 03 long scalar)
+      var v = null;
+      try {
+        v = decodeAscentVAt(data, i);
+      } catch (err) {
+        if ((b >= 0xd0 && b <= 0xf4) || b === 0xf5) throw err;
+        v = null;
+      }
+      if (v !== null) {
+        pushChar(String.fromCodePoint(v.cp), i);
+        i = v.end;
+        continue;
+      }
+
+      flushText(i);
+
+      if (b === 0x9a) {
+        var agentPair = decodeAgent(data, i);
+        events.push(agentPair[0]);
+        i = agentPair[1];
+        continue;
+      }
+      if (b === 0x9d) {
+        var mmPair = decodeMm(data, i);
+        events.push(mmPair[0]);
+        i = mmPair[1];
+        continue;
+      }
+      if (b === 0x9c) {
+        var crPair = decodeCrypto(data, i);
+        events.push(crPair[0]);
+        i = crPair[1];
+        continue;
+      }
+      if (b === 0xc0) {
+        var defPair = decodeDef(data, i);
+        events.push(defPair[0]);
+        i = defPair[1];
+        continue;
+      }
+      if (b === LEAD_VERSION_BUMP) {
+        var bumpPair = decodeP2U16Skip(data, i, "VERSION_BUMP");
+        events.push(bumpPair[0]);
+        i = bumpPair[1];
+        continue;
+      }
+      if (b === LEAD_REGISTRY_DELTA) {
+        var deltaPair = decodeP2U32Skip(data, i, "REGISTRY_DELTA");
+        events.push(deltaPair[0]);
+        i = deltaPair[1];
+        continue;
+      }
+      if (b === LEAD_SKYSTATE) {
+        var skyPair = decodeSkystate(data, i);
+        events.push(skyPair[0]);
+        i = skyPair[1];
+        continue;
+      }
+      if (b === LEAD_TURN) {
+        var turnPair = decodeTurn(data, i);
+        events.push(turnPair[0]);
+        i = turnPair[1];
+        continue;
+      }
+      if (b === LEAD_PRIVATE_OP) {
+        var privPair = decodePrivateOpSkip(data, i);
+        events.push(privPair[0]);
+        i = privPair[1];
+        continue;
+      }
+      if (b === 0x9f) {
+        events.push({ kind: "pad", count: 1, offset: i, end: i + 1 });
+        i += 1;
+        continue;
+      }
+      // Cont alone is illegal as lead
+      if (Cont.isCont(b)) {
+        throw new AscentError(
+          "orphan Cont lead 0x" + b.toString(16) + " at offset " + i
+        );
+      }
+      throw new AscentError(
+        "unsupported lead byte 0x" + b.toString(16) + " at offset " + i
+      );
+    }
+
+    flushText(i);
+    return events;
+  }
+
+  var AEGIR_ALG = {
+    0x0100: "AEGIR-SUITE-1",
+    0x0101: "AEGIR-DCH-KEM-768",
+    0x0102: "AEGIR-DCH-KEM-1024",
+    0x0103: "AEGIR-AEAD-AES256-GCMSIV",
+    0x0104: "AEGIR-AEAD-CHACHA20POLY",
+    0x0105: "AEGIR-HBOP-SHA512",
+    0x0106: "AEGIR-SIG-HYBRID-65",
+    0x0107: "AEGIR-SIG-SLH-128f",
+    0x0108: "AEGIR-DSR-STATE",
+    0x0109: "AEGIR-MPR-V1",
+    0x010a: "AEGIR-IMS-SEAL",
+    0x010b: "AEGIR-DEMO-X25519-GCM",
+  };
+
+  /**
+   * Lightweight AEGIR sketch: XOR demo seal for UI only (not wire crypto).
+   * Real hybrid PQ lives in ref/aegir_sketch.py. This shows envelope shape.
+   */
+  function aegirDemoSeal(plaintext, passphrase) {
+    var pt =
+      typeof plaintext === "string" ? utf8Encode(plaintext) : plaintext;
+    var keySrc = utf8Encode("AEGIR-DEMO|" + (passphrase || "lab"));
+    var key = [];
+    for (var i = 0; i < 32; i++) {
+      key.push(keySrc[i % keySrc.length] ^ (0x5a + i));
+    }
+    var nonce = new Uint8Array(12);
+    for (var n = 0; n < 12; n++) nonce[n] = (n * 17 + 0x42) & 0xff;
+    var ct = new Uint8Array(pt.length);
+    for (var j = 0; j < pt.length; j++) {
+      ct[j] = pt[j] ^ key[j % 32] ^ nonce[j % 12];
+    }
+    var frame = encodeCrypto({
+      alg: 0x010b,
+      kid: "demo-kid-1",
+      nonce: nonce,
+      ct: ct,
+    });
+    return {
+      alg: 0x010b,
+      algName: AEGIR_ALG[0x010b],
+      kid: "demo-kid-1",
+      nonceHex: hexOf(nonce),
+      ctHex: hexOf(ct),
+      frame: new Uint8Array(frame),
+      note: "Lab XOR sketch only. Production AEGIR uses hybrid KEM+AEAD (see design/AEGIR.md).",
+    };
+  }
+
+  function aegirDemoOpen(frameU8, passphrase) {
+    var events = decodeStream(frameU8);
+    var cr = null;
+    for (var i = 0; i < events.length; i++) {
+      if (events[i].kind === "crypto") {
+        cr = events[i];
+        break;
+      }
+    }
+    if (!cr) throw new AscentError("no crypto unit in stream");
+    // Re-derive for sketch: re-parse ct from raw frame is heavy; lab returns metadata
+    return {
+      alg: cr.alg,
+      algName: AEGIR_ALG[cr.alg] || ("0x" + cr.alg.toString(16)),
+      kidHex: cr.kidHex,
+      nonceHex: cr.nonceHex,
+      ctLen: cr.ctLen,
+      note: "Opened envelope metadata. Lab XOR open requires matching seal path in UI.",
+    };
+  }
+
+  var AscentCodec = {
+    Cont: Cont,
+    contByte: contByte,
+    contVal: contVal,
+    encodeScalar: encodeScalar,
+    decodeAscentVAt: decodeAscentVAt,
+    longFormRequired: longFormRequired,
+    ASCENT_V_LONG_MIN: ASCENT_V_LONG_MIN,
+    encodeText: encodeText,
+    encodeAgentFrame: encodeAgentFrame,
+    encodeRoleFrame: encodeRoleFrame,
+    escapeAgentArgs: escapeAgentArgs,
+    unescapeAgentArgs: unescapeAgentArgs,
+    FLAG_CRITICAL: FLAG_CRITICAL,
+    encodeMm: encodeMm,
+    encodeMmInlineUtf8: encodeMmInlineUtf8,
+    encodeMmRef: encodeMmRef,
+    encodeCrypto: encodeCrypto,
+    encodePathhint: encodePathhint,
+    decodeSkystate: decodeSkystate,
+    canonicalPathhintBytes: canonicalPathhintBytes,
+    encodeTurn: encodeTurn,
+    decodeTurn: decodeTurn,
+    canonicalTurnBytes: canonicalTurnBytes,
+    encodeMmChunk: encodeMmChunk,
+    encodeMmEnd: encodeMmEnd,
+    reassembleChunks: reassembleChunks,
+    LEAD_TURN: LEAD_TURN,
+    recommendIntegrity: recommendIntegrity,
+    recommendStack: recommendStack,
+    evaluatePathhint: evaluatePathhint,
+    pathhintOverheadBytes: pathhintOverheadBytes,
+    crc32Ieee: crc32Ieee,
+    LEAD_SKYSTATE: LEAD_SKYSTATE,
+    PATHHINT_SCHEMA_V1: PATHHINT_SCHEMA_V1,
+    decodeStream: decodeStream,
+    analyzeStream: analyzeStream,
+    concatBytes: concatBytes,
+    fromHex: fromHex,
+    hexOf: hexOf,
+    formatHexLines: formatHexLines,
+    utf8Encode: utf8Encode,
+    utf8Decode: utf8Decode,
+    OPCODE: OPCODE,
+    OPCODE_BY_NAME: OPCODE_BY_NAME,
+    MM_KIND: MM_KIND,
+    HASH_ALG: HASH_ALG,
+    AEGIR_ALG: AEGIR_ALG,
+    aegirDemoSeal: aegirDemoSeal,
+    aegirDemoOpen: aegirDemoOpen,
+    HELLO_UNIVERSE_HEX: HELLO_UNIVERSE_HEX,
+    HEADER_MAGIC: HEADER_MAGIC,
+    AscentError: AscentError,
+    version: "2.2.0-delay-hull",
+  };
+
+  global.AscentCodec = AscentCodec;
+})(typeof window !== "undefined" ? window : globalThis);

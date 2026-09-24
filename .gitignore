@@ -1,0 +1,18 @@
+﻿# ASCENT product ignores
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+site/.wrangler/
+.venv/
+venv/
+
+# dual-mode client lab spool
+examples/ascent_starlink_client/spool/
+
+
+.orbit/
+.wrangler/
